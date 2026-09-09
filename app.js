@@ -1,0 +1,656 @@
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "midea-ac-pwa-state-v1";
+  const CLIMATE_NAME = "AC Unit";
+  const WIFI_NAME = "WiFi Signal dBm";
+  const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
+  const DEVICE_NAME_ENTITY = "Device Name";
+  const MAC_ADDRESS_ENTITY = "Device MAC Address";
+  const IP_ADDRESS_ENTITY = "Device IP Address";
+  const REQUEST_TIMEOUT = 1800;
+  const SCAN_TIMEOUT = 950;
+  const SCAN_CONCURRENCY = 28;
+
+  const app = document.getElementById("app");
+  const toast = document.getElementById("toast");
+  const subtitle = document.getElementById("header-subtitle");
+  const installButton = document.getElementById("install-button");
+  let installPrompt = null;
+  let state = loadState();
+  let route = { name: "dashboard", deviceId: null };
+  let detailTimer = null;
+  let scanAbort = false;
+
+  function defaultState() {
+    return { devices: [], subnets: [], autoScan: true, lastScan: 0 };
+  }
+
+  function loadState() {
+    try {
+      return Object.assign(defaultState(), JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"));
+    } catch (_) {
+      return defaultState();
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function showToast(message, ms = 2600) {
+    toast.textContent = message;
+    toast.classList.remove("hidden");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.add("hidden"), ms);
+  }
+
+  function normalizeHost(input) {
+    let value = String(input || "").trim();
+    if (!value) return "";
+    if (!/^https?:\/\//i.test(value)) value = "http://" + value;
+    try {
+      const u = new URL(value);
+      return u.origin;
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function deviceIdFor(baseUrl) {
+    return btoa(baseUrl).replaceAll("=", "").replaceAll("+", "-").replaceAll("/", "_");
+  }
+
+  function subnetFromUrl(baseUrl) {
+    try {
+      const host = new URL(baseUrl).hostname;
+      const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (!m) return null;
+      const nums = m.slice(1).map(Number);
+      if (nums.some(n => n < 0 || n > 255)) return null;
+      return nums.slice(0, 3).join(".");
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function validSubnetPrefix(prefix) {
+    const m = String(prefix || "").trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    return !!m && m.slice(1).every(v => Number(v) >= 0 && Number(v) <= 255);
+  }
+
+  async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      return await fetch(url, Object.assign({ cache: "no-store", mode: "cors", credentials: "omit" }, options, { signal: controller.signal }));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function getJson(baseUrl, domain, name, detail = false, timeout = REQUEST_TIMEOUT) {
+    const url = `${baseUrl}/${domain}/${encodeURIComponent(name)}${detail ? "?detail=all&_=" + Date.now() : "?_=" + Date.now()}`;
+    const response = await fetchWithTimeout(url, { method: "GET" }, timeout);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }
+
+  async function postAction(baseUrl, domain, name, action, params = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) qs.set(k, String(v));
+    });
+    const suffix = qs.toString() ? `?${qs}` : "";
+    const url = `${baseUrl}/${domain}/${encodeURIComponent(name)}/${action}${suffix}`;
+    const response = await fetchWithTimeout(url, { method: "POST" }, REQUEST_TIMEOUT);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return true;
+  }
+
+  async function tryEntity(baseUrl, domain, names, detail = false, timeout = REQUEST_TIMEOUT) {
+    let last = null;
+    for (const name of names) {
+      try { return await getJson(baseUrl, domain, name, detail, timeout); }
+      catch (e) { last = e; }
+    }
+    throw last || new Error("Entity unavailable");
+  }
+
+  async function probeDevice(baseUrl, timeout = SCAN_TIMEOUT) {
+    const climate = await tryEntity(
+      baseUrl,
+      "climate",
+      [CLIMATE_NAME, "ac_unit"],
+      true,
+      timeout
+    );
+
+    let friendlyName = "";
+    let deviceName = "";
+    let macAddress = "";
+    let ipAddress = "";
+
+    // Latest controller firmware: runtime-editable Friendly Name.
+    try {
+      const label = await tryEntity(
+        baseUrl,
+        "text",
+        [FRIENDLY_NAME_ENTITY, "device_friendly_name"],
+        false,
+        timeout
+      );
+      friendlyName = String(label.value ?? label.state ?? "").trim();
+    } catch (_) {
+      // Backward compatibility with the original PWA test firmware.
+      try {
+        const legacyLabel = await tryEntity(
+          baseUrl,
+          "text_sensor",
+          ["PWA Device Name", "pwa_device_name"],
+          false,
+          timeout
+        );
+        friendlyName = String(
+          legacyLabel.value ?? legacyLabel.state ?? ""
+        ).trim();
+      } catch (_) {}
+    }
+
+    try {
+      const value = await tryEntity(
+        baseUrl,
+        "text_sensor",
+        [DEVICE_NAME_ENTITY, "device_name"],
+        false,
+        timeout
+      );
+      deviceName = String(value.value ?? value.state ?? "").trim();
+    } catch (_) {}
+
+    try {
+      const value = await tryEntity(
+        baseUrl,
+        "text_sensor",
+        [MAC_ADDRESS_ENTITY, "device_mac_address"],
+        false,
+        timeout
+      );
+      macAddress = String(value.value ?? value.state ?? "").trim();
+    } catch (_) {}
+
+    try {
+      const value = await tryEntity(
+        baseUrl,
+        "text_sensor",
+        [IP_ADDRESS_ENTITY, "device_ip_address"],
+        false,
+        timeout
+      );
+      ipAddress = String(value.value ?? value.state ?? "").trim();
+    } catch (_) {}
+
+    if (!friendlyName) {
+      friendlyName =
+        deviceName ||
+        (() => {
+          try { return new URL(baseUrl).hostname; }
+          catch (_) { return baseUrl; }
+        })();
+    }
+
+    return {
+      climate,
+      friendlyName,
+      deviceName,
+      macAddress,
+      ipAddress
+    };
+  }
+
+  function upsertDevice(baseUrl, probe, source = "scan") {
+    const stableIdentity =
+      String(probe.deviceName || "").trim() ||
+      String(probe.macAddress || "").trim().toLowerCase() ||
+      baseUrl;
+
+    const stableId = deviceIdFor(stableIdentity);
+
+    // Match the same physical unit even if DHCP changes its IP address.
+    let device = state.devices.find(d =>
+      d.id === stableId ||
+      d.baseUrl === baseUrl ||
+      (
+        probe.deviceName &&
+        d.deviceName &&
+        d.deviceName === probe.deviceName
+      ) ||
+      (
+        probe.macAddress &&
+        d.macAddress &&
+        String(d.macAddress).toLowerCase() ===
+          String(probe.macAddress).toLowerCase()
+      )
+    );
+
+    if (!device) {
+      device = {
+        id: stableId,
+        baseUrl,
+        name:
+          probe.friendlyName ||
+          probe.deviceName ||
+          new URL(baseUrl).hostname,
+        addedAt: Date.now(),
+        source
+      };
+      state.devices.push(device);
+    } else {
+      // Migrate older base-URL IDs to the permanent controller identity.
+      device.id = stableId;
+      device.baseUrl = baseUrl;
+
+      if (
+        probe.friendlyName &&
+        !device.customName
+      ) {
+        device.name = probe.friendlyName;
+      }
+    }
+
+    device.deviceName = probe.deviceName || device.deviceName || "";
+    device.macAddress = probe.macAddress || device.macAddress || "";
+    device.ipAddress =
+      probe.ipAddress ||
+      (() => {
+        try { return new URL(baseUrl).hostname; }
+        catch (_) { return ""; }
+      })();
+
+    device.online = true;
+    device.lastSeen = Date.now();
+    device.climate = probe.climate;
+
+    const subnet = subnetFromUrl(baseUrl);
+    if (subnet && !state.subnets.includes(subnet)) {
+      state.subnets.push(subnet);
+    }
+
+    saveState();
+    return device;
+  }
+
+  async function refreshDevice(device) {
+    try {
+      const probe = await probeDevice(device.baseUrl, REQUEST_TIMEOUT);
+      upsertDevice(device.baseUrl, probe, device.source || "saved");
+      try {
+        const wifi = await tryEntity(device.baseUrl, "sensor", [WIFI_NAME, "wifi_signal_dbm"], false, 1200);
+        device.wifi = Number(wifi.value);
+      } catch (_) { device.wifi = null; }
+      device.online = true;
+      device.error = "";
+    } catch (e) {
+      device.online = false;
+      device.error = e && e.message ? e.message : String(e);
+    }
+    saveState();
+    return device;
+  }
+
+  async function refreshAllDevices(renderAfter = true) {
+    if (!state.devices.length) return;
+    subtitle.textContent = "Refreshing local controllers…";
+    await Promise.allSettled(state.devices.map(refreshDevice));
+    subtitle.textContent = `${state.devices.filter(d => d.online).length}/${state.devices.length} controllers online`;
+    if (renderAfter && route.name === "dashboard") renderDashboard();
+  }
+
+  function setRoute(name, deviceId = null) {
+    clearInterval(detailTimer);
+    detailTimer = null;
+    route = { name, deviceId };
+    document.querySelectorAll(".nav-button").forEach(b => b.classList.toggle("active", b.dataset.route === name));
+    if (name === "dashboard") renderDashboard();
+    else if (name === "discover") renderDiscover();
+    else if (name === "settings") renderSettings();
+    else if (name === "device") renderDevice(deviceId);
+  }
+
+  function human(value) {
+    const v = String(value ?? "").replaceAll("_", " ").toLowerCase();
+    return v ? v.charAt(0).toUpperCase() + v.slice(1) : "--";
+  }
+
+  function formatTemp(value, digits = 1) {
+    const n = Number(value);
+    return Number.isFinite(n) ? `${n.toFixed(digits)}°C` : "--.-°C";
+  }
+
+  function renderDashboard() {
+    subtitle.textContent = state.devices.length ? `${state.devices.filter(d => d.online).length}/${state.devices.length} controllers online` : "Local ESPHome controllers";
+    const cards = state.devices.map(device => {
+      const c = device.climate || {};
+      const mode = String(c.mode || "OFF").toUpperCase();
+      const status = device.online ? "online" : "offline";
+      const summary = device.online
+        ? `${human(mode)}${mode !== "OFF" && Number.isFinite(Number(c.target_temperature)) ? " → " + formatTemp(c.target_temperature) : ""}`
+        : "Controller unavailable";
+      return `
+        <article class="card unit-card" data-device-id="${escapeHtml(device.id)}">
+          <div class="unit-card-head">
+            <div><div class="unit-name">${escapeHtml(device.name)}</div><div class="unit-address">${escapeHtml(device.deviceName || device.baseUrl.replace(/^https?:\/\//, ""))}${device.ipAddress ? " · " + escapeHtml(device.ipAddress) : ""}</div></div>
+            <span class="status-pill ${status}">${device.online ? "Online" : "Offline"}</span>
+          </div>
+          <div class="unit-temp">${device.online ? formatTemp(c.current_temperature) : "--.-°C"}</div>
+          <div class="unit-summary">${escapeHtml(summary)}</div>
+          <div class="unit-card-actions">
+            <button class="button primary small" type="button" data-open-device="${escapeHtml(device.id)}">Control</button>
+            <button class="button small" type="button" data-refresh-device="${escapeHtml(device.id)}">Refresh</button>
+          </div>
+        </article>`;
+    }).join("");
+
+    app.innerHTML = `
+      <h1 class="section-title">Air Conditioners</h1>
+      <p class="section-copy">All control traffic stays on your local network.</p>
+      ${cards ? `<div class="unit-grid">${cards}</div>` : `
+        <div class="card empty-state"><strong>No AC controllers yet</strong>Open Discover, enter your local network prefix once, and scan for units.<br><br><button class="button primary" id="empty-discover">Discover units</button></div>`}
+    `;
+
+    app.querySelectorAll("[data-open-device]").forEach(b => b.addEventListener("click", () => setRoute("device", b.dataset.openDevice)));
+    app.querySelectorAll("[data-refresh-device]").forEach(b => b.addEventListener("click", async () => {
+      const d = state.devices.find(x => x.id === b.dataset.refreshDevice); if (!d) return;
+      b.disabled = true; await refreshDevice(d); renderDashboard();
+    }));
+    document.getElementById("empty-discover")?.addEventListener("click", () => setRoute("discover"));
+  }
+
+  async function renderDevice(deviceId) {
+    const device = state.devices.find(d => d.id === deviceId);
+    if (!device) return setRoute("dashboard");
+
+    app.innerHTML = `
+      <div class="back-row"><button class="back-button" id="back-units" type="button">← All units</button><span class="status-pill ${device.online ? "online" : "offline"}" id="device-online">${device.online ? "Online" : "Offline"}</span></div>
+      <div class="device-title">${escapeHtml(device.name)}</div>
+      <div class="unit-address" style="margin-bottom:12px">${escapeHtml(device.baseUrl)}</div>
+      <section class="card thermostat-card">
+        <div class="thermostat-top"><div class="current-label">Current temperature</div><div class="current-value" id="current-temp">--.-°C</div></div>
+        <div class="thermostat-dial">
+          <svg class="thermostat-svg" viewBox="0 0 300 258" aria-hidden="true">
+            <circle id="arc-track" class="arc track" cx="150" cy="150" r="112"></circle>
+            <circle id="arc-zone" class="arc zone" cx="150" cy="150" r="112"></circle>
+            <circle id="arc-delta" class="arc delta" cx="150" cy="150" r="112"></circle>
+            <circle id="target-marker" class="target-marker" cx="150" cy="38" r="8"></circle>
+            <circle id="current-marker" class="current-marker" cx="150" cy="38" r="5"></circle>
+          </svg>
+          <div class="thermostat-center"><div class="center-mode" id="center-mode">--</div><div class="target-line"><span class="target-value" id="target-temp">--</span><span class="target-unit">°C</span></div></div>
+          <div class="step-row"><button id="temp-down" class="step-button" type="button">−</button><button id="temp-up" class="step-button" type="button">+</button></div>
+        </div>
+        <div class="control-tiles">
+          <button class="control-tile" data-menu="mode-menu"><span class="label">Mode</span><span class="value" id="mode-value">--</span></button>
+          <button class="control-tile" data-menu="fan-menu"><span class="label">Fan mode</span><span class="value" id="fan-value">--</span></button>
+          <button class="control-tile" data-menu="swing-menu"><span class="label">Swing mode</span><span class="value" id="swing-value">--</span></button>
+        </div>
+        <div class="choice-panel" id="mode-menu">
+          ${["OFF","COOL","HEAT","DRY","FAN_ONLY","AUTO"].map(v => `<button class="choice" data-mode="${v}" type="button">${human(v)}</button>`).join("")}
+        </div>
+        <div class="choice-panel" id="fan-menu">
+          ${["AUTO","LOW","MEDIUM","HIGH"].map(v => `<button class="choice" data-fan="${v}" type="button">${human(v)}</button>`).join("")}
+          <button class="choice" data-boost="1" type="button">Boost</button>
+        </div>
+        <div class="choice-panel" id="swing-menu">
+          ${["OFF","VERTICAL","HORIZONTAL","BOTH"].map(v => `<button class="choice" data-swing="${v}" type="button">${human(v)}</button>`).join("")}
+        </div>
+        <div class="function-row"><button id="toggle-display" class="button" type="button">Toggle Display</button><button id="refresh-detail" class="button" type="button">Refresh</button><button id="open-native" class="button" type="button">Open device page</button></div>
+        <div class="device-status" id="device-status">Connecting…</div>
+      </section>`;
+
+    document.getElementById("back-units").addEventListener("click", () => setRoute("dashboard"));
+    document.getElementById("open-native").addEventListener("click", () => window.open(device.baseUrl + "/", "_blank"));
+    app.querySelectorAll("[data-menu]").forEach(b => b.addEventListener("click", () => {
+      const id = b.dataset.menu;
+      app.querySelectorAll(".choice-panel").forEach(p => p.classList.toggle("open", p.id === id && !p.classList.contains("open")));
+    }));
+
+    async function command(label, fn) {
+      const status = document.getElementById("device-status");
+      status.textContent = label;
+      setDetailBusy(true);
+      try { await fn(); status.textContent = "Command sent."; setTimeout(loadDetail, 650); setTimeout(loadDetail, 1900); }
+      catch (e) { status.textContent = `Command failed: ${e.message || e}`; }
+      finally { setDetailBusy(false); }
+    }
+
+    function setDetailBusy(busy) {
+      app.querySelectorAll(".thermostat-card button").forEach(b => b.disabled = busy);
+    }
+
+    app.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => command(`Setting ${human(b.dataset.mode)}…`, () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { mode: b.dataset.mode }))));
+    const fanEntity = { AUTO: "AC Fan: Auto", LOW: "AC Fan: Low", MEDIUM: "AC Fan: Medium", HIGH: "AC Fan: High" };
+    app.querySelectorAll("[data-fan]").forEach(b => b.addEventListener("click", () => command(`Setting fan ${human(b.dataset.fan)}…`, () => postAction(device.baseUrl, "button", fanEntity[b.dataset.fan], "press"))));
+    app.querySelector("[data-boost]").addEventListener("click", () => command("Toggling Boost…", () => postAction(device.baseUrl, "button", "AC Preset: Boost", "press")));
+    app.querySelectorAll("[data-swing]").forEach(b => b.addEventListener("click", () => command(`Setting swing ${human(b.dataset.swing)}…`, () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { swing_mode: b.dataset.swing }))));
+    document.getElementById("toggle-display").addEventListener("click", () => command("Toggling display…", () => postAction(device.baseUrl, "button", "Turn off LED", "press")));
+    document.getElementById("refresh-detail").addEventListener("click", loadDetail);
+    document.getElementById("temp-down").addEventListener("click", () => adjustTemp(-1));
+    document.getElementById("temp-up").addEventListener("click", () => adjustTemp(1));
+
+    function adjustTemp(direction) {
+      const c = device.climate || {};
+      const step = Number(c.step) > 0 ? Number(c.step) : .5;
+      const current = Number(c.target_temperature);
+      if (!Number.isFinite(current)) return;
+      let target = current + direction * step;
+      if (Number.isFinite(Number(c.min_temp))) target = Math.max(target, Number(c.min_temp));
+      if (Number.isFinite(Number(c.max_temp))) target = Math.min(target, Number(c.max_temp));
+      target = Math.round(target * 10) / 10;
+      command(`Setting target ${target.toFixed(1)}°C…`, () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { target_temperature: target }));
+    }
+
+    function renderClimate(c) {
+      device.climate = c;
+      document.getElementById("current-temp").textContent = formatTemp(c.current_temperature);
+      document.getElementById("target-temp").textContent = Number.isFinite(Number(c.target_temperature)) ? Number(c.target_temperature).toFixed(1) : "--";
+      document.getElementById("center-mode").textContent = human(c.mode);
+      document.getElementById("mode-value").textContent = human(c.mode);
+      document.getElementById("fan-value").textContent = human(c.preset && String(c.preset).toUpperCase() === "BOOST" ? "BOOST" : c.fan_mode);
+      document.getElementById("swing-value").textContent = human(c.swing_mode);
+      document.getElementById("device-online").className = "status-pill online";
+      document.getElementById("device-online").textContent = "Online";
+      updateArc(c);
+      updateChoices(c);
+    }
+
+    function updateChoices(c) {
+      const mode = String(c.mode || "").toUpperCase();
+      const fan = String(c.fan_mode || "").toUpperCase();
+      const swing = String(c.swing_mode || "").toUpperCase();
+      app.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+      app.querySelectorAll("[data-fan]").forEach(b => b.classList.toggle("active", b.dataset.fan === fan));
+      app.querySelectorAll("[data-swing]").forEach(b => b.classList.toggle("active", b.dataset.swing === swing));
+    }
+
+    function updateArc(c) {
+      const r = 112, circumference = 2 * Math.PI * r, arcLength = circumference * .75;
+      const min = Number.isFinite(Number(c.min_temp)) ? Number(c.min_temp) : 17;
+      const max = Number.isFinite(Number(c.max_temp)) ? Number(c.max_temp) : 30;
+      const frac = value => Math.max(0, Math.min(1, (Number(value) - min) / (max - min)));
+      const tf = frac(c.target_temperature), cf = frac(c.current_temperature);
+      const track = document.getElementById("arc-track");
+      track.style.strokeDasharray = `${arcLength} ${circumference - arcLength}`;
+      function segment(el, a, b) {
+        const start = Math.min(a,b), end = Math.max(a,b), len = Math.max(0,(end-start)*arcLength);
+        el.style.display = len < .5 ? "none" : "";
+        el.style.strokeDasharray = `${len} ${circumference-len}`;
+        el.style.strokeDashoffset = String(-start*arcLength);
+      }
+      segment(document.getElementById("arc-zone"), tf, 1);
+      segment(document.getElementById("arc-delta"), tf, cf);
+      function marker(el, f) {
+        const angle = (135 + f*270) * Math.PI/180;
+        el.setAttribute("cx", (150+r*Math.cos(angle)).toFixed(2));
+        el.setAttribute("cy", (150+r*Math.sin(angle)).toFixed(2));
+      }
+      marker(document.getElementById("target-marker"), tf);
+      marker(document.getElementById("current-marker"), cf);
+    }
+
+    async function loadDetail() {
+      if (route.name !== "device" || route.deviceId !== device.id) return;
+      const status = document.getElementById("device-status"); if (!status) return;
+      try {
+        const c = await tryEntity(device.baseUrl, "climate", [CLIMATE_NAME, "ac_unit"], true, REQUEST_TIMEOUT);
+        renderClimate(c); device.online = true; device.lastSeen = Date.now(); status.textContent = "Connected."; saveState();
+      } catch (e) {
+        device.online = false; saveState();
+        document.getElementById("device-online").className = "status-pill offline";
+        document.getElementById("device-online").textContent = "Offline";
+        status.textContent = `Unable to read controller: ${e.message || e}`;
+      }
+    }
+
+    await loadDetail();
+    detailTimer = setInterval(loadDetail, 5000);
+  }
+
+  function renderDiscover() {
+    const first = state.subnets[0] || "192.168.1";
+    app.innerHTML = `
+      <h1 class="section-title">Discover AC Units</h1>
+      <p class="section-copy">The browser does not expose its local subnet to a PWA. Enter the first three numbers once; future launches can scan remembered networks automatically.</p>
+      <section class="card"><div class="card-body">
+        <div class="form-row"><label for="subnet-input">Local /24 network prefix</label><div class="inline-form"><input class="text-input" id="subnet-input" value="${escapeHtml(first)}" inputmode="decimal" placeholder="192.168.1"><button class="button primary" id="scan-button" type="button">Scan</button></div></div>
+        <div class="progress-shell hidden" id="scan-progress-shell"><div class="progress-bar" id="scan-progress"></div></div>
+        <div class="scan-status" id="scan-status">Scans addresses .1 through .254 for an ESPHome climate entity named “AC Unit”.</div>
+      </div></section>
+      <section class="card"><div class="card-body">
+        <h2 class="section-title" style="font-size:1rem">Add a controller manually</h2>
+        <div class="inline-form"><input class="text-input" id="manual-address" placeholder="192.168.1.72 or ac-bedroom.local"><button class="button" id="manual-add" type="button">Add</button></div>
+      </div></section>
+      <section class="card"><div class="card-body"><h2 class="section-title" style="font-size:1rem">Discovered / saved units</h2><div id="discover-device-list"></div></div></section>`;
+
+    renderDiscoverList();
+    document.getElementById("scan-button").addEventListener("click", () => startScan(document.getElementById("subnet-input").value));
+    document.getElementById("manual-add").addEventListener("click", () => addManual(document.getElementById("manual-address").value));
+  }
+
+  function renderDiscoverList() {
+    const host = document.getElementById("discover-device-list"); if (!host) return;
+    host.innerHTML = state.devices.length ? state.devices.map(d => `
+      <div class="saved-device"><div><strong>${escapeHtml(d.name)}</strong><div class="unit-address">${escapeHtml(d.deviceName || d.baseUrl)}${d.ipAddress ? " · " + escapeHtml(d.ipAddress) : ""}${d.macAddress ? " · " + escapeHtml(d.macAddress) : ""}</div></div><button class="button small" data-control="${escapeHtml(d.id)}" type="button">Control</button></div>`).join("") : `<div class="section-copy">No units saved yet.</div>`;
+    host.querySelectorAll("[data-control]").forEach(b => b.addEventListener("click", () => setRoute("device", b.dataset.control)));
+  }
+
+  async function addManual(input) {
+    const baseUrl = normalizeHost(input);
+    if (!baseUrl) return showToast("Enter a valid IP address or hostname.");
+    const btn = document.getElementById("manual-add"); btn.disabled = true;
+    try {
+      const probe = await probeDevice(baseUrl, REQUEST_TIMEOUT);
+      const d = upsertDevice(baseUrl, probe, "manual");
+      renderDiscoverList(); showToast(`${d.name} added.`);
+    } catch (e) {
+      showToast(`Controller not found: ${e.message || e}`, 4200);
+    } finally { btn.disabled = false; }
+  }
+
+  async function startScan(prefix, quiet = false) {
+    prefix = String(prefix || "").trim();
+    if (!validSubnetPrefix(prefix)) {
+      if (!quiet) showToast("Use a prefix such as 192.168.1");
+      return;
+    }
+    if (!state.subnets.includes(prefix)) state.subnets.unshift(prefix);
+    saveState();
+    scanAbort = false;
+
+    const scanButton = document.getElementById("scan-button");
+    const status = document.getElementById("scan-status");
+    const bar = document.getElementById("scan-progress");
+    const shell = document.getElementById("scan-progress-shell");
+    if (scanButton) { scanButton.disabled = true; scanButton.textContent = "Scanning…"; }
+    shell?.classList.remove("hidden");
+
+    let next = 1, complete = 0, found = 0;
+    const total = 254;
+
+    async function worker() {
+      while (next <= total && !scanAbort) {
+        const n = next++;
+        const baseUrl = `http://${prefix}.${n}`;
+        try {
+          const probe = await probeDevice(baseUrl, SCAN_TIMEOUT);
+          const before = state.devices.length;
+          const d = upsertDevice(baseUrl, probe, "scan");
+          if (state.devices.length > before) found++;
+          if (!quiet) renderDiscoverList();
+          console.info("Discovered", d.name, baseUrl);
+        } catch (_) {}
+        complete++;
+        if (bar) bar.style.width = `${Math.round(complete/total*100)}%`;
+        if (status) status.textContent = `Scanning ${prefix}.0/24 — ${complete}/${total}; ${found} new unit${found === 1 ? "" : "s"} found.`;
+      }
+    }
+
+    await Promise.all(Array.from({length: SCAN_CONCURRENCY}, worker));
+    state.lastScan = Date.now(); saveState();
+    if (scanButton) { scanButton.disabled = false; scanButton.textContent = "Scan"; }
+    if (status) status.textContent = `Scan complete. ${found} new unit${found === 1 ? "" : "s"} added.`;
+    if (!quiet) renderDiscoverList();
+    else if (route.name === "dashboard") { await refreshAllDevices(false); renderDashboard(); }
+  }
+
+  function renderSettings() {
+    const origin = location.origin;
+    const yaml = `web_server:\n  port: 80\n  version: 3\n  allowed_origins:\n    - ${origin}\n  enable_private_network_access: true`;
+    app.innerHTML = `
+      <h1 class="section-title">Settings</h1>
+      <section class="card"><div class="card-body">
+        <div class="form-row"><label><input id="auto-scan" type="checkbox" ${state.autoScan ? "checked" : ""}> Automatically rescan remembered subnet(s) when the app starts</label></div>
+        <div class="form-row"><label>Remembered subnet(s)</label><div>${state.subnets.length ? state.subnets.map(s => `<span class="status-pill">${escapeHtml(s)}.0/24</span>`).join(" ") : "None"}</div></div>
+      </div></section>
+      <section class="card"><div class="card-body">
+        <h2 class="section-title" style="font-size:1rem">Required ESPHome web-server settings</h2>
+        <p class="section-copy">Merge these lines into each controller's existing <code>web_server:</code> block. The allowed origin must exactly match where this PWA is hosted.</p>
+        <div class="code-box">${escapeHtml(yaml)}</div>
+        <p class="section-copy" style="margin-top:12px">With the current controller YAML, discovery uses <strong>Device Friendly Name</strong> for the room label, <strong>Device Name</strong> as the permanent controller identity, and also records the controller's MAC and current IP address.</p>
+      </div></section>
+      <section class="card"><div class="card-body"><h2 class="section-title" style="font-size:1rem">Saved controllers</h2><div>${state.devices.map(d => `<div class="saved-device"><div><strong>${escapeHtml(d.name)}</strong><div class="unit-address">${escapeHtml(d.baseUrl)}</div></div><button class="button danger small" data-remove="${escapeHtml(d.id)}">Remove</button></div>`).join("") || "No saved controllers."}</div></div></section>`;
+
+    document.getElementById("auto-scan").addEventListener("change", e => { state.autoScan = e.target.checked; saveState(); });
+    app.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", () => {
+      state.devices = state.devices.filter(d => d.id !== b.dataset.remove); saveState(); renderSettings();
+    }));
+  }
+
+  document.querySelectorAll(".nav-button").forEach(b => b.addEventListener("click", () => setRoute(b.dataset.route)));
+
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault(); installPrompt = event; installButton.classList.remove("hidden");
+  });
+  installButton.addEventListener("click", async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; installButton.classList.add("hidden");
+  });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(console.error));
+  }
+
+  setRoute("dashboard");
+  refreshAllDevices(true).then(async () => {
+    if (state.autoScan && state.subnets.length) {
+      for (const subnet of state.subnets.slice(0, 3)) await startScan(subnet, true);
+    }
+  });
+})();

@@ -1,0 +1,136 @@
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-high: #eef2f7;
+  --text: #111827;
+  --muted: #6b7280;
+  --outline: #d1d5db;
+  --primary: #2563eb;
+  --primary-soft: #dbeafe;
+  --ok: #15803d;
+  --warn: #b45309;
+  --danger: #b91c1c;
+  --shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0f14;
+    --surface: #121820;
+    --surface-high: #1b2430;
+    --text: #f3f4f6;
+    --muted: #9ca3af;
+    --outline: #374151;
+    --primary: #60a5fa;
+    --primary-soft: #172554;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --shadow: 0 2px 12px rgba(0,0,0,.35);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: wait; opacity: .55; }
+
+.app-header {
+  position: sticky; top: 0; z-index: 20;
+  min-height: 72px; padding: 10px max(16px, env(safe-area-inset-left));
+  display: flex; align-items: center; justify-content: space-between;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-bottom: 1px solid var(--outline); backdrop-filter: blur(12px);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon { width: 52px; height: 42px; object-fit: contain; }
+.brand-title { font-size: 1.1rem; font-weight: 700; }
+.brand-subtitle { color: var(--muted); font-size: .78rem; }
+.icon-button, .button, .choice, .step-button {
+  border: 1px solid var(--outline); background: var(--surface); color: var(--text); border-radius: 10px; padding: 9px 12px;
+}
+.button.primary { background: var(--primary); color: white; border-color: var(--primary); }
+.button.danger { color: var(--danger); }
+.button.small { padding: 7px 10px; font-size: .84rem; }
+.hidden { display: none !important; }
+
+.app-main { width: min(100%, 980px); margin: 0 auto; padding: 18px 16px 92px; }
+.section-title { margin: 0 0 12px; font-size: 1.25rem; }
+.section-copy { margin: -4px 0 16px; color: var(--muted); line-height: 1.45; }
+.card { background: var(--surface); border: 1px solid var(--outline); border-radius: 14px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 14px; }
+.card-body { padding: 16px; }
+
+.unit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.unit-card { min-height: 166px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.unit-card-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.unit-name { font-weight: 700; font-size: 1.04rem; }
+.unit-address { color: var(--muted); font-size: .75rem; margin-top: 2px; }
+.status-pill { font-size: .72rem; padding: 4px 8px; border-radius: 999px; background: var(--surface-high); color: var(--muted); white-space: nowrap; }
+.status-pill.online { color: var(--ok); }
+.status-pill.offline { color: var(--danger); }
+.unit-temp { font-size: 2rem; font-weight: 600; line-height: 1; margin-top: 2px; }
+.unit-summary { color: var(--muted); min-height: 20px; }
+.unit-card-actions { margin-top: auto; display: flex; gap: 8px; }
+.empty-state { text-align: center; padding: 34px 18px; color: var(--muted); }
+.empty-state strong { display: block; color: var(--text); font-size: 1.05rem; margin-bottom: 6px; }
+
+.back-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.back-button { border: 0; background: transparent; color: var(--primary); padding: 6px 0; }
+.device-title { font-size: 1.2rem; font-weight: 700; }
+
+.thermostat-card { padding: 16px; }
+.thermostat-top { text-align: center; margin-bottom: -24px; }
+.current-label { color: var(--muted); font-size: .84rem; }
+.current-value { margin-top: 3px; font-size: 1.42rem; font-weight: 600; }
+.thermostat-dial { position: relative; width: min(100%, 400px); aspect-ratio: 1/.86; margin: 0 auto; }
+.thermostat-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.arc { fill: none; stroke-width: 18; stroke-linecap: round; transform: rotate(135deg); transform-origin: 150px 150px; }
+.arc.track { stroke: var(--surface-high); }
+.arc.zone { stroke: var(--primary); opacity: .30; }
+.arc.delta { stroke: var(--primary); opacity: .95; }
+.target-marker { fill: var(--surface); stroke: var(--primary); stroke-width: 3.5; }
+.current-marker { fill: var(--primary); stroke: var(--primary-soft); stroke-width: 3; }
+.thermostat-center { position: absolute; left: 50%; top: 48%; transform: translate(-50%,-50%); width: 60%; text-align: center; }
+.center-mode { min-height: 22px; font-size: .98rem; }
+.target-line { display: inline-flex; align-items: flex-start; margin-top: 7px; }
+.target-value { font-size: 3.45rem; line-height: .95; letter-spacing: -.04em; }
+.target-unit { margin: 4px 0 0 4px; font-size: 1rem; }
+.step-row { position: absolute; left: 50%; bottom: 1%; transform: translateX(-50%); display: flex; gap: 20px; }
+.step-button { width: 46px; height: 46px; border-radius: 50%; padding: 0; font-size: 1.65rem; line-height: 42px; }
+
+.control-tiles { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 10px; }
+.control-tile { border: 1px solid transparent; border-radius: 12px; background: var(--surface-high); color: var(--text); min-height: 58px; padding: 9px 10px; text-align: left; }
+.control-tile .label { display: block; color: var(--muted); font-size: .72rem; }
+.control-tile .value { display: block; margin-top: 2px; font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.choice-panel { display: none; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding: 10px; border: 1px solid var(--outline); border-radius: 12px; background: var(--surface-high); }
+.choice-panel.open { display: flex; }
+.choice.active { border-color: var(--primary); background: var(--primary-soft); }
+.function-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--outline); }
+.device-status { margin-top: 12px; color: var(--muted); font-size: .82rem; }
+
+.form-row { display: grid; gap: 6px; margin-bottom: 14px; }
+.form-row label { font-size: .82rem; color: var(--muted); }
+.text-input { width: 100%; min-height: 42px; border: 1px solid var(--outline); border-radius: 10px; background: var(--surface); color: var(--text); padding: 9px 11px; }
+.inline-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.progress-shell { height: 8px; border-radius: 999px; background: var(--surface-high); overflow: hidden; margin-top: 12px; }
+.progress-bar { width: 0%; height: 100%; background: var(--primary); transition: width .12s linear; }
+.scan-status { margin-top: 8px; color: var(--muted); font-size: .82rem; }
+.saved-device { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--outline); }
+.saved-device:last-child { border-bottom: 0; }
+.code-box { overflow: auto; padding: 12px; border-radius: 10px; background: var(--surface-high); font: .78rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre; }
+
+.bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(3,1fr); padding: 8px max(10px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--surface) 95%, transparent); border-top: 1px solid var(--outline); backdrop-filter: blur(12px); }
+.nav-button { border: 0; background: transparent; color: var(--muted); padding: 9px; border-radius: 10px; }
+.nav-button.active { color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+.toast { position: fixed; z-index: 100; left: 50%; bottom: 82px; transform: translateX(-50%); max-width: min(90vw,520px); padding: 10px 14px; color: white; background: #111827; border-radius: 10px; box-shadow: var(--shadow); font-size: .84rem; }
+
+@media (max-width: 520px) {
+  .app-main { padding-left: 10px; padding-right: 10px; }
+  .thermostat-card { padding: 12px 10px; }
+  .thermostat-dial { width: min(100%,360px); }
+  .target-value { font-size: 3.15rem; }
+  .control-tiles { gap: 7px; }
+  .control-tile { padding: 8px; }
+}

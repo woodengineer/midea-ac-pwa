@@ -1,0 +1,52 @@
+# PWA additions for the CURRENT controller YAML.
+#
+# Replace YOUR_GITHUB_USERNAME with the account hosting the PWA.
+#
+# If your PWA URL is:
+#   https://YOUR_GITHUB_USERNAME.github.io/midea-ac-pwa/
+#
+# allowed_origins must contain ONLY the origin:
+#   https://YOUR_GITHUB_USERNAME.github.io
+
+web_server:
+  version: "3"
+  js_include: app.js
+  include_internal: false
+  log: false
+  ota: false
+  allowed_origins:
+    - https://YOUR_GITHUB_USERNAME.github.io
+  enable_private_network_access: true
+
+# The current controller YAML should also contain:
+#
+# text:
+#   - platform: template
+#     name: "Device Friendly Name"
+#     id: device_friendly_name
+#     internal: true
+#     optimistic: true
+#     restore_value: true
+#     min_length: 1
+#     max_length: 40
+#     mode: TEXT
+#     initial_value: "AC Unit"
+#
+# text_sensor:
+#   - platform: template
+#     name: "Device Name"
+#     id: device_name
+#     internal: true
+#     update_interval: 60s
+#     lambda: |-
+#       return std::string(App.get_name().c_str());
+#
+#   - platform: wifi_info
+#     ip_address:
+#       name: "Device IP Address"
+#       id: device_ip_address
+#       internal: true
+#     mac_address:
+#       name: "Device MAC Address"
+#       id: device_mac_address
+#       internal: true
