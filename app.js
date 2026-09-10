@@ -3,14 +3,16 @@
 
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
-  const WIFI_NAME = "WiFi Signal dBm";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
   const DEVICE_NAME_ENTITY = "Device Name";
   const MAC_ADDRESS_ENTITY = "Device MAC Address";
   const IP_ADDRESS_ENTITY = "Device IP Address";
-  const REQUEST_TIMEOUT = 1800;
-  const SCAN_TIMEOUT = 950;
-  const SCAN_CONCURRENCY = 28;
+  const REQUEST_TIMEOUT = 4000;
+  const SCAN_TIMEOUT = 1500;
+  const SCAN_CONCURRENCY = 10;
+  const OFFLINE_FAILURE_THRESHOLD = 3;
+  const DETAIL_REFRESH_INTERVAL = 8000;
+  const COMMAND_VERIFY_DELAY = 2000;
 
   const app = document.getElementById("app");
   const toast = document.getElementById("toast");
@@ -23,7 +25,7 @@
   let scanAbort = false;
 
   function defaultState() {
-    return { devices: [], subnets: [], autoScan: true, lastScan: 0 };
+    return { devices: [], subnets: [], lastScan: 0 };
   }
 
   function loadState() {
@@ -276,6 +278,7 @@
         catch (_) { return ""; }
       })();
 
+    device.failureCount = 0;
     device.online = true;
     device.lastSeen = Date.now();
     device.climate = probe.climate;
@@ -289,19 +292,36 @@
     return device;
   }
 
+  function markDeviceSuccess(device, climate) {
+    device.failureCount = 0;
+    device.online = true;
+    device.error = "";
+    device.lastSeen = Date.now();
+    if (climate) device.climate = climate;
+  }
+
+  function markDeviceFailure(device, error) {
+    device.failureCount = Number(device.failureCount || 0) + 1;
+    device.error = error && error.message ? error.message : String(error || "Request failed");
+    if (device.failureCount >= OFFLINE_FAILURE_THRESHOLD) {
+      device.online = false;
+    }
+  }
+
   async function refreshDevice(device) {
     try {
-      const probe = await probeDevice(device.baseUrl, REQUEST_TIMEOUT);
-      upsertDevice(device.baseUrl, probe, device.source || "saved");
-      try {
-        const wifi = await tryEntity(device.baseUrl, "sensor", [WIFI_NAME, "wifi_signal_dbm"], false, 1200);
-        device.wifi = Number(wifi.value);
-      } catch (_) { device.wifi = null; }
-      device.online = true;
-      device.error = "";
+      // Routine health checks read only the climate endpoint. Identity metadata
+      // is collected during discovery/manual add instead of on every refresh.
+      const climate = await tryEntity(
+        device.baseUrl,
+        "climate",
+        [CLIMATE_NAME, "ac_unit"],
+        true,
+        REQUEST_TIMEOUT
+      );
+      markDeviceSuccess(device, climate);
     } catch (e) {
-      device.online = false;
-      device.error = e && e.message ? e.message : String(e);
+      markDeviceFailure(device, e);
     }
     saveState();
     return device;
@@ -316,7 +336,7 @@
   }
 
   function setRoute(name, deviceId = null) {
-    clearInterval(detailTimer);
+    clearTimeout(detailTimer);
     detailTimer = null;
     route = { name, deviceId };
     document.querySelectorAll(".nav-button").forEach(b => b.classList.toggle("active", b.dataset.route === name));
@@ -426,8 +446,17 @@
       const status = document.getElementById("device-status");
       status.textContent = label;
       setDetailBusy(true);
-      try { await fn(); status.textContent = "Command sent."; setTimeout(loadDetail, 650); setTimeout(loadDetail, 1900); }
-      catch (e) { status.textContent = `Command failed: ${e.message || e}`; }
+      clearTimeout(detailTimer);
+      detailTimer = null;
+      try {
+        await fn();
+        status.textContent = "Command sent.";
+        scheduleDetailRefresh(COMMAND_VERIFY_DELAY);
+      }
+      catch (e) {
+        status.textContent = `Command failed: ${e.message || e}`;
+        scheduleDetailRefresh(3000);
+      }
       finally { setDetailBusy(false); }
     }
 
@@ -505,29 +534,81 @@
       marker(document.getElementById("current-marker"), cf);
     }
 
-    async function loadDetail() {
+    let detailRequestActive = false;
+
+    function scheduleDetailRefresh(delay = DETAIL_REFRESH_INTERVAL) {
+      clearTimeout(detailTimer);
+      detailTimer = setTimeout(() => {
+        detailTimer = null;
+        loadDetail(true);
+      }, delay);
+    }
+
+    async function loadDetail(scheduleNext = true) {
       if (route.name !== "device" || route.deviceId !== device.id) return;
-      const status = document.getElementById("device-status"); if (!status) return;
+
+      // Never overlap detail reads. A slow ESP32 response should not cause the
+      // next poll to pile on top of the current request.
+      if (detailRequestActive) {
+        if (scheduleNext) scheduleDetailRefresh(1000);
+        return;
+      }
+
+      clearTimeout(detailTimer);
+      detailTimer = null;
+      const status = document.getElementById("device-status");
+      if (!status) return;
+      detailRequestActive = true;
+
       try {
-        const c = await tryEntity(device.baseUrl, "climate", [CLIMATE_NAME, "ac_unit"], true, REQUEST_TIMEOUT);
-        renderClimate(c); device.online = true; device.lastSeen = Date.now(); status.textContent = "Connected."; saveState();
+        const c = await tryEntity(
+          device.baseUrl,
+          "climate",
+          [CLIMATE_NAME, "ac_unit"],
+          true,
+          REQUEST_TIMEOUT
+        );
+
+        if (route.name !== "device" || route.deviceId !== device.id) return;
+        markDeviceSuccess(device, c);
+        renderClimate(c);
+        status.textContent = "Connected.";
+        saveState();
       } catch (e) {
-        device.online = false; saveState();
-        document.getElementById("device-online").className = "status-pill offline";
-        document.getElementById("device-online").textContent = "Offline";
-        status.textContent = `Unable to read controller: ${e.message || e}`;
+        if (route.name !== "device" || route.deviceId !== device.id) return;
+        markDeviceFailure(device, e);
+        saveState();
+
+        const pill = document.getElementById("device-online");
+        if (device.online === false) {
+          if (pill) {
+            pill.className = "status-pill offline";
+            pill.textContent = "Offline";
+          }
+          status.textContent = `Unable to read controller after ${device.failureCount} consecutive attempts: ${e.message || e}`;
+        } else {
+          if (pill) {
+            pill.className = "status-pill online";
+            pill.textContent = "Online";
+          }
+          status.textContent = `Connection delayed (${device.failureCount}/${OFFLINE_FAILURE_THRESHOLD}); keeping unit Online.`;
+        }
+      } finally {
+        detailRequestActive = false;
+        if (scheduleNext && route.name === "device" && route.deviceId === device.id) {
+          scheduleDetailRefresh();
+        }
       }
     }
 
-    await loadDetail();
-    detailTimer = setInterval(loadDetail, 5000);
+    await loadDetail(true);
   }
 
   function renderDiscover() {
     const first = state.subnets[0] || "192.168.1";
     app.innerHTML = `
       <h1 class="section-title">Discover AC Units</h1>
-      <p class="section-copy">The browser does not expose its local subnet to a PWA. Enter the first three numbers once; future launches can scan remembered networks automatically.</p>
+      <p class="section-copy">The browser does not expose its local subnet to a PWA. Enter the first three numbers and press Scan when you want to discover new controllers.</p>
       <section class="card"><div class="card-body">
         <div class="form-row"><label for="subnet-input">Local /24 network prefix</label><div class="inline-form"><input class="text-input" id="subnet-input" value="${escapeHtml(first)}" inputmode="decimal" placeholder="192.168.1"><button class="button primary" id="scan-button" type="button">Scan</button></div></div>
         <div class="progress-shell hidden" id="scan-progress-shell"><div class="progress-bar" id="scan-progress"></div></div>
@@ -616,8 +697,8 @@
     app.innerHTML = `
       <h1 class="section-title">Settings</h1>
       <section class="card"><div class="card-body">
-        <div class="form-row"><label><input id="auto-scan" type="checkbox" ${state.autoScan ? "checked" : ""}> Automatically rescan remembered subnet(s) when the app starts</label></div>
         <div class="form-row"><label>Remembered subnet(s)</label><div>${state.subnets.length ? state.subnets.map(s => `<span class="status-pill">${escapeHtml(s)}.0/24</span>`).join(" ") : "None"}</div></div>
+        <p class="section-copy" style="margin-top:12px">Saved controllers are checked directly when the app starts. Full /24 subnet scans run only when you press Scan on the Discover page.</p>
       </div></section>
       <section class="card"><div class="card-body">
         <h2 class="section-title" style="font-size:1rem">Required ESPHome web-server settings</h2>
@@ -627,7 +708,6 @@
       </div></section>
       <section class="card"><div class="card-body"><h2 class="section-title" style="font-size:1rem">Saved controllers</h2><div>${state.devices.map(d => `<div class="saved-device"><div><strong>${escapeHtml(d.name)}</strong><div class="unit-address">${escapeHtml(d.baseUrl)}</div></div><button class="button danger small" data-remove="${escapeHtml(d.id)}">Remove</button></div>`).join("") || "No saved controllers."}</div></div></section>`;
 
-    document.getElementById("auto-scan").addEventListener("change", e => { state.autoScan = e.target.checked; saveState(); });
     app.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", () => {
       state.devices = state.devices.filter(d => d.id !== b.dataset.remove); saveState(); renderSettings();
     }));
@@ -648,9 +728,7 @@
   }
 
   setRoute("dashboard");
-  refreshAllDevices(true).then(async () => {
-    if (state.autoScan && state.subnets.length) {
-      for (const subnet of state.subnets.slice(0, 3)) await startScan(subnet, true);
-    }
-  });
+  // On startup, check only saved controllers. A full subnet scan is intentionally
+  // user-initiated from Discover so the ESP32 web servers are never flooded.
+  refreshAllDevices(true);
 })();
