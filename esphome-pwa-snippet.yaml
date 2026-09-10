@@ -50,3 +50,20 @@ web_server:
 #       name: "Device MAC Address"
 #       id: device_mac_address
 #       internal: true
+
+
+# PWA v0.2.3 also reads the following persistent select from the full
+# controller YAML. Configure it on the individual controller Settings page:
+#
+# select:
+#   - platform: template
+#     name: "Temperature Unit"
+#     id: device_temperature_unit
+#     internal: true
+#     optimistic: true
+#     restore_value: true
+#     options: ["Celsius", "Fahrenheit"]
+#     initial_option: "Celsius"
+#
+# This is a presentation preference only. Midea/UART and schedule setpoints
+# remain Celsius internally.

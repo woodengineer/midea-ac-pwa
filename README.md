@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.2
+# Midea AC Control PWA v0.2.3
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -99,7 +99,7 @@ replacement for network security.
 
 ## Current scope
 
-Version 0.2.1 keeps schedule editing on each controller's existing local web page.
+Version 0.2.3 keeps schedule editing on each controller's existing local web page.
 The PWA thermostat has an **Open device page** button. A later version can bring
 the existing 10-schedule editor directly into the PWA while keeping execution on
 each ESP32.
@@ -142,3 +142,18 @@ device identities.
 - Adds the running PWA software version to the Settings page.
 - The Settings page now shows **Software Version: v0.2.2**.
 - Bumps the service-worker cache to `midea-ac-pwa-v0.2.2` so the updated app is retrieved after deployment.
+
+
+## v0.2.3 per-unit Temperature Unit
+
+- Adds support for the controller-side `Temperature Unit` select entity.
+- The preference is stored on each ESP32, not in the PWA.
+- Each unit may independently display Celsius or Fahrenheit.
+- Midea/ESPHome target temperatures remain Celsius internally.
+- Fahrenheit presentation uses whole-degree °F values.
+- In Fahrenheit mode the +/- buttons request 1 °F changes, then map the
+  request to the nearest valid 0.5 °C Midea setpoint.
+- The PWA reads the Temperature Unit during discovery/manual add and again
+  when a unit is opened. It is not added to the routine 8-second poll.
+- The physical indoor-unit display setting remains independent and is not
+  changed by this preference.

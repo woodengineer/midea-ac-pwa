@@ -1,13 +1,14 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.2";
+  const APP_VERSION = "0.2.3";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
   const DEVICE_NAME_ENTITY = "Device Name";
   const MAC_ADDRESS_ENTITY = "Device MAC Address";
   const IP_ADDRESS_ENTITY = "Device IP Address";
+  const TEMPERATURE_UNIT_ENTITY = "Temperature Unit";
   const REQUEST_TIMEOUT = 4000;
   const SCAN_TIMEOUT = 1500;
   const SCAN_CONCURRENCY = 10;
@@ -142,6 +143,7 @@
     let deviceName = "";
     let macAddress = "";
     let ipAddress = "";
+    let temperatureUnit = "Celsius";
 
     // Latest controller firmware: runtime-editable Friendly Name.
     try {
@@ -202,6 +204,19 @@
       ipAddress = String(value.value ?? value.state ?? "").trim();
     } catch (_) {}
 
+    try {
+      const value = await tryEntity(
+        baseUrl,
+        "select",
+        [TEMPERATURE_UNIT_ENTITY, "device_temperature_unit"],
+        false,
+        timeout
+      );
+      temperatureUnit = normalizeTemperatureUnit(value.value ?? value.state ?? "Celsius");
+    } catch (_) {
+      temperatureUnit = "Celsius";
+    }
+
     if (!friendlyName) {
       friendlyName =
         deviceName ||
@@ -216,7 +231,8 @@
       friendlyName,
       deviceName,
       macAddress,
-      ipAddress
+      ipAddress,
+      temperatureUnit
     };
   }
 
@@ -278,6 +294,9 @@
         try { return new URL(baseUrl).hostname; }
         catch (_) { return ""; }
       })();
+    device.temperatureUnit = normalizeTemperatureUnit(
+      probe.temperatureUnit || device.temperatureUnit || "Celsius"
+    );
 
     device.failureCount = 0;
     device.online = true;
@@ -306,6 +325,26 @@
     device.error = error && error.message ? error.message : String(error || "Request failed");
     if (device.failureCount >= OFFLINE_FAILURE_THRESHOLD) {
       device.online = false;
+    }
+  }
+
+  async function refreshDeviceTemperatureUnit(device, timeout = REQUEST_TIMEOUT) {
+    try {
+      const value = await tryEntity(
+        device.baseUrl,
+        "select",
+        [TEMPERATURE_UNIT_ENTITY, "device_temperature_unit"],
+        false,
+        timeout
+      );
+      device.temperatureUnit = normalizeTemperatureUnit(value.value ?? value.state ?? "Celsius");
+      saveState();
+      return true;
+    } catch (_) {
+      // Backward-compatible default for controllers that have not yet received
+      // the per-unit Temperature Unit firmware update.
+      device.temperatureUnit = normalizeTemperatureUnit(device.temperatureUnit || "Celsius");
+      return false;
     }
   }
 
@@ -352,9 +391,48 @@
     return v ? v.charAt(0).toUpperCase() + v.slice(1) : "--";
   }
 
-  function formatTemp(value, digits = 1) {
+  function normalizeTemperatureUnit(value) {
+    const text = String(value ?? "").trim().toLowerCase();
+    return (text === "fahrenheit" || text === "f" || text === "°f")
+      ? "Fahrenheit"
+      : "Celsius";
+  }
+
+  function usesFahrenheit(unit) {
+    return normalizeTemperatureUnit(unit) === "Fahrenheit";
+  }
+
+  function temperatureUnitSymbol(unit) {
+    return usesFahrenheit(unit) ? "°F" : "°C";
+  }
+
+  function celsiusToFahrenheit(value) {
+    return (Number(value) * 9 / 5) + 32;
+  }
+
+  function fahrenheitToCelsius(value) {
+    return (Number(value) - 32) * 5 / 9;
+  }
+
+  function formatTemp(value, unit = "Celsius") {
     const n = Number(value);
-    return Number.isFinite(n) ? `${n.toFixed(digits)}°C` : "--.-°C";
+    if (!Number.isFinite(n)) return usesFahrenheit(unit) ? "--°F" : "--.-°C";
+    if (usesFahrenheit(unit)) return `${Math.round(celsiusToFahrenheit(n))}°F`;
+    return `${n.toFixed(1)}°C`;
+  }
+
+  function formatTargetTemp(value, unit = "Celsius", includeUnit = false) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "--";
+    let text;
+    if (usesFahrenheit(unit)) {
+      text = String(Math.round(celsiusToFahrenheit(n)));
+    } else if (Math.abs(n - Math.round(n)) < 0.001) {
+      text = String(Math.round(n));
+    } else {
+      text = n.toFixed(1);
+    }
+    return includeUnit ? text + temperatureUnitSymbol(unit) : text;
   }
 
   function renderDashboard() {
@@ -364,7 +442,7 @@
       const mode = String(c.mode || "OFF").toUpperCase();
       const status = device.online ? "online" : "offline";
       const summary = device.online
-        ? `${human(mode)}${mode !== "OFF" && Number.isFinite(Number(c.target_temperature)) ? " → " + formatTemp(c.target_temperature) : ""}`
+        ? `${human(mode)}${mode !== "OFF" && Number.isFinite(Number(c.target_temperature)) ? " → " + formatTargetTemp(c.target_temperature, device.temperatureUnit, true) : ""}`
         : "Controller unavailable";
       return `
         <article class="card unit-card" data-device-id="${escapeHtml(device.id)}">
@@ -372,7 +450,7 @@
             <div><div class="unit-name">${escapeHtml(device.name)}</div><div class="unit-address">${escapeHtml(device.deviceName || device.baseUrl.replace(/^https?:\/\//, ""))}${device.ipAddress ? " · " + escapeHtml(device.ipAddress) : ""}</div></div>
             <span class="status-pill ${status}">${device.online ? "Online" : "Offline"}</span>
           </div>
-          <div class="unit-temp">${device.online ? formatTemp(c.current_temperature) : "--.-°C"}</div>
+          <div class="unit-temp">${device.online ? formatTemp(c.current_temperature, device.temperatureUnit) : (usesFahrenheit(device.temperatureUnit) ? "--°F" : "--.-°C")}</div>
           <div class="unit-summary">${escapeHtml(summary)}</div>
           <div class="unit-card-actions">
             <button class="button primary small" type="button" data-open-device="${escapeHtml(device.id)}">Control</button>
@@ -399,13 +477,15 @@
   async function renderDevice(deviceId) {
     const device = state.devices.find(d => d.id === deviceId);
     if (!device) return setRoute("dashboard");
+    device.temperatureUnit = normalizeTemperatureUnit(device.temperatureUnit || "Celsius");
+    const initialUnitSymbol = temperatureUnitSymbol(device.temperatureUnit);
 
     app.innerHTML = `
       <div class="back-row"><button class="back-button" id="back-units" type="button">← All units</button><span class="status-pill ${device.online ? "online" : "offline"}" id="device-online">${device.online ? "Online" : "Offline"}</span></div>
       <div class="device-title">${escapeHtml(device.name)}</div>
       <div class="unit-address" style="margin-bottom:12px">${escapeHtml(device.baseUrl)}</div>
       <section class="card thermostat-card">
-        <div class="thermostat-top"><div class="current-label">Current temperature</div><div class="current-value" id="current-temp">--.-°C</div></div>
+        <div class="thermostat-top"><div class="current-label">Current temperature</div><div class="current-value" id="current-temp">${usesFahrenheit(device.temperatureUnit) ? "--°F" : "--.-°C"}</div></div>
         <div class="thermostat-dial">
           <svg class="thermostat-svg" viewBox="0 0 300 258" aria-hidden="true">
             <circle id="arc-track" class="arc track" cx="150" cy="150" r="112"></circle>
@@ -414,7 +494,7 @@
             <circle id="target-marker" class="target-marker" cx="150" cy="38" r="8"></circle>
             <circle id="current-marker" class="current-marker" cx="150" cy="38" r="5"></circle>
           </svg>
-          <div class="thermostat-center"><div class="center-mode" id="center-mode">--</div><div class="target-line"><span class="target-value" id="target-temp">--</span><span class="target-unit">°C</span></div></div>
+          <div class="thermostat-center"><div class="center-mode" id="center-mode">--</div><div class="target-line"><span class="target-value" id="target-temp">--</span><span class="target-unit" id="target-unit">${initialUnitSymbol}</span></div></div>
           <div class="step-row"><button id="temp-down" class="step-button" type="button">−</button><button id="temp-up" class="step-button" type="button">+</button></div>
         </div>
         <div class="control-tiles">
@@ -480,17 +560,34 @@
       const step = Number(c.step) > 0 ? Number(c.step) : .5;
       const current = Number(c.target_temperature);
       if (!Number.isFinite(current)) return;
-      let target = current + direction * step;
+
+      let requestedCelsius;
+      if (usesFahrenheit(device.temperatureUnit)) {
+        // Fahrenheit UI steps in whole degrees, then maps to the nearest valid
+        // Midea/ESPHome Celsius increment.
+        const currentFahrenheit = Math.round(celsiusToFahrenheit(current));
+        requestedCelsius = fahrenheitToCelsius(currentFahrenheit + direction);
+      } else {
+        requestedCelsius = current + direction * step;
+      }
+
+      let target = Math.round(requestedCelsius / step) * step;
       if (Number.isFinite(Number(c.min_temp))) target = Math.max(target, Number(c.min_temp));
       if (Number.isFinite(Number(c.max_temp))) target = Math.min(target, Number(c.max_temp));
       target = Math.round(target * 10) / 10;
-      command(`Setting target ${target.toFixed(1)}°C…`, () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { target_temperature: target }));
+
+      command(
+        `Setting target ${formatTargetTemp(target, device.temperatureUnit, true)}…`,
+        () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { target_temperature: target })
+      );
     }
 
     function renderClimate(c) {
       device.climate = c;
-      document.getElementById("current-temp").textContent = formatTemp(c.current_temperature);
-      document.getElementById("target-temp").textContent = Number.isFinite(Number(c.target_temperature)) ? Number(c.target_temperature).toFixed(1) : "--";
+      document.getElementById("current-temp").textContent = formatTemp(c.current_temperature, device.temperatureUnit);
+      document.getElementById("target-temp").textContent = formatTargetTemp(c.target_temperature, device.temperatureUnit, false);
+      const targetUnit = document.getElementById("target-unit");
+      if (targetUnit) targetUnit.textContent = temperatureUnitSymbol(device.temperatureUnit);
       document.getElementById("center-mode").textContent = human(c.mode);
       document.getElementById("mode-value").textContent = human(c.mode);
       document.getElementById("fan-value").textContent = human(c.preset && String(c.preset).toUpperCase() === "BOOST" ? "BOOST" : c.fan_mode);
@@ -602,6 +699,10 @@
       }
     }
 
+    // Read the per-controller display preference when this unit is opened.
+    // This is intentionally not part of the 8-second climate polling loop.
+    await refreshDeviceTemperatureUnit(device);
+    if (device.climate) renderClimate(device.climate);
     await loadDetail(true);
   }
 
@@ -706,7 +807,7 @@
         <h2 class="section-title" style="font-size:1rem">Required ESPHome web-server settings</h2>
         <p class="section-copy">Merge these lines into each controller's existing <code>web_server:</code> block. The allowed origin must exactly match where this PWA is hosted.</p>
         <div class="code-box">${escapeHtml(yaml)}</div>
-        <p class="section-copy" style="margin-top:12px">With the current controller YAML, discovery uses <strong>Device Friendly Name</strong> for the room label, <strong>Device Name</strong> as the permanent controller identity, and also records the controller's MAC and current IP address.</p>
+        <p class="section-copy" style="margin-top:12px">With the current controller YAML, discovery uses <strong>Device Friendly Name</strong> for the room label, <strong>Device Name</strong> as the permanent controller identity, records the controller's MAC/current IP address, and reads the per-unit <strong>Temperature Unit</strong> preference. Temperature Unit is configured on the individual controller, not in this PWA.</p>
       </div></section>
       <section class="card"><div class="card-body"><h2 class="section-title" style="font-size:1rem">Saved controllers</h2><div>${state.devices.map(d => `<div class="saved-device"><div><strong>${escapeHtml(d.name)}</strong><div class="unit-address">${escapeHtml(d.baseUrl)}</div></div><button class="button danger small" data-remove="${escapeHtml(d.id)}">Remove</button></div>`).join("") || "No saved controllers."}</div></div></section>`;
 
