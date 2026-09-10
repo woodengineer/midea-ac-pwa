@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.0
+# Midea AC Control PWA v0.2.1
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -8,8 +8,8 @@ multiple local ESPHome/Midea AC controllers.
 - Installs from GitHub Pages on phone, tablet, or PC.
 - Caches the application shell locally with a service worker.
 - Remembers discovered controllers in browser local storage.
-- Rechecks saved controllers on startup.
-- Can automatically rescan remembered `/24` subnets on startup.
+- Rechecks only saved controllers on startup.
+- Runs full `/24` subnet discovery only when you explicitly press **Scan**.
 - Scans for an ESPHome climate entity named `AC Unit`.
 - Shows a multi-unit dashboard.
 - Opens a thermostat view for each unit.
@@ -27,8 +27,9 @@ For that reason, on the first run enter the local `/24` prefix once, for example
 
     192.168.1
 
-The PWA stores that prefix. On later launches it can automatically scan
-`192.168.1.1` through `192.168.1.254`.
+The PWA stores that prefix for convenience. A full scan of
+`192.168.1.1` through `192.168.1.254` runs only when you press **Scan**.
+Saved controllers are checked directly by their remembered address on startup.
 
 If a controller is added manually by IPv4 address, the PWA also learns that
 controller's `/24` prefix automatically.
@@ -51,12 +52,12 @@ the origin to allow is:
 
 Do not include the repository path in `allowed_origins`.
 
-### Optional room naming
+### Controller identity and room naming
 
-The included YAML snippet adds a text sensor named `PWA Device Name`.
-Change `pwa_room_name` for each controller. The PWA then automatically labels
-newly discovered units by room. Without that sensor, the unit is still discovered
-but is initially labeled by its IP address/hostname.
+The current controller firmware exposes `Device Friendly Name`, `Device Name`,
+`Device MAC Address`, and `Device IP Address`. `Device Friendly Name` supplies
+the room/display label used by the PWA. `Device Name` and MAC are used as stable
+identities so rediscovery can update a controller even if DHCP changes its IP.
 
 ## GitHub Pages deployment
 
@@ -98,7 +99,7 @@ replacement for network security.
 
 ## Current scope
 
-Version 0.1 keeps schedule editing on each controller's existing local web page.
+Version 0.2.1 keeps schedule editing on each controller's existing local web page.
 The PWA thermostat has an **Open device page** button. A later version can bring
 the existing 10-schedule editor directly into the PWA while keeping execution on
 each ESP32.
@@ -115,3 +116,23 @@ This version is synchronized with the latest controller `app.js` and YAML:
 - `Device IP Address` shows the current DHCP address.
 - Rediscovery matches an existing controller by Device Name or MAC, so an IP
   change can update the existing saved controller rather than adding a duplicate.
+
+
+## v0.2.1 connection reliability changes
+
+This release reduces false Online/Offline transitions and HTTP load on ESP32-C3
+controllers:
+
+- Normal REST request timeout increased from 1.8 seconds to 4 seconds.
+- A controller is marked Offline only after 3 consecutive failed reads.
+- Any successful read immediately resets the failure counter and marks it Online.
+- Routine startup/dashboard health checks read only the `AC Unit` climate entity.
+- Device identity metadata is read during discovery/manual add instead of every poll.
+- Detail-view polling is serialized: only one climate request may be outstanding.
+- Detail refresh interval increased from 5 seconds to 8 seconds.
+- Commands perform one verification read about 2 seconds after the command.
+- Automatic startup subnet scans were removed. Full subnet scans are manual only.
+- Discovery concurrency reduced to 10 workers and scan timeout increased to 1.5 seconds.
+
+These changes do not alter the controller firmware, schedules, UI controls, or saved
+device identities.
