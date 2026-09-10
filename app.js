@@ -1,6 +1,7 @@
 (() => {
   "use strict";
 
+  const APP_VERSION = "0.2.2";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -697,6 +698,7 @@
     app.innerHTML = `
       <h1 class="section-title">Settings</h1>
       <section class="card"><div class="card-body">
+        <div class="form-row"><label>Software Version</label><div><strong>v${escapeHtml(APP_VERSION)}</strong></div></div>
         <div class="form-row"><label>Remembered subnet(s)</label><div>${state.subnets.length ? state.subnets.map(s => `<span class="status-pill">${escapeHtml(s)}.0/24</span>`).join(" ") : "None"}</div></div>
         <p class="section-copy" style="margin-top:12px">Saved controllers are checked directly when the app starts. Full /24 subnet scans run only when you press Scan on the Discover page.</p>
       </div></section>

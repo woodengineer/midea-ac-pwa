@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.1
+# Midea AC Control PWA v0.2.2
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -136,3 +136,9 @@ controllers:
 
 These changes do not alter the controller firmware, schedules, UI controls, or saved
 device identities.
+
+## v0.2.2 version display
+
+- Adds the running PWA software version to the Settings page.
+- The Settings page now shows **Software Version: v0.2.2**.
+- Bumps the service-worker cache to `midea-ac-pwa-v0.2.2` so the updated app is retrieved after deployment.
