@@ -1,9 +1,9 @@
-const CACHE = "midea-ac-pwa-v0.2.4";
+const CACHE = "midea-ac-pwa-v0.2.4-fixed";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./app.css",
-  "./app.js",
+  "./app.css?v=0.2.4-fixed",
+  "./app.js?v=0.2.4-fixed",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
@@ -29,13 +29,10 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) return; // never cache/proxy LAN controller traffic
 
   event.respondWith(
-    caches.match(request).then(cached => {
-      const network = fetch(request).then(response => {
-        const copy = response.clone();
-        caches.open(CACHE).then(cache => cache.put(request, copy));
-        return response;
-      }).catch(() => cached);
-      return cached || network;
-    })
+    fetch(request).then(response => {
+      const copy = response.clone();
+      caches.open(CACHE).then(cache => cache.put(request, copy));
+      return response;
+    }).catch(() => caches.match(request))
   );
 });

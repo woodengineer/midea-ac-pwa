@@ -1,0 +1,17 @@
+Midea AC PWA v0.2.4-fixed
+=========================
+
+This is a COMPLETE PWA folder rebuilt from the known-working v0.2.3 PWA.
+
+Changes from v0.2.3:
+- Toggle Display uses combined LED-on + LED-off icons.
+- Refresh uses an icon-only button.
+- Discovery, manual add, LAN REST, controller identity, polling, and command code
+  are retained from the working v0.2.3 source.
+- app.js/app.css have explicit cache-busting URLs in index.html.
+- Service-worker cache is midea-ac-pwa-v0.2.4-fixed and uses network-first
+  for same-origin PWA assets with cached offline fallback.
+
+Deployment:
+Replace the CONTENTS of your GitHub Pages PWA directory with the complete
+contents of this folder, preserving .nojekyll and the icons directory.
