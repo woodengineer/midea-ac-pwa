@@ -79,7 +79,7 @@ button:disabled { cursor: wait; opacity: .55; }
 .status-pill { font-size: .72rem; padding: 4px 8px; border-radius: 999px; background: var(--surface-high); color: var(--muted); white-space: nowrap; }
 .status-pill.online { color: var(--ok); }
 .status-pill.offline { color: var(--danger); }
-.unit-temp { font-size: 2rem; font-weight: 600; line-height: 1; margin-top: 0; margin-bottom: 0; }
+.unit-temp { font-size: 2rem; font-weight: 600; line-height: 1; margin-top: 5px; margin-bottom: 0; }
 .unit-summary-row { margin-top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; }
 .unit-summary { color: var(--muted); min-height: 20px; display: flex; align-items: center; }
 .unit-refresh-button { margin-left: auto; flex: 0 0 auto; }
