@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.10";
+  const APP_VERSION = "0.2.11";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -479,7 +479,6 @@
     }).join("");
 
     app.innerHTML = `
-      <h1 class="section-title">Air Conditioners</h1>
       ${cards ? `<div class="unit-grid">${cards}</div>` : `
         <div class="card empty-state"><strong>No AC controllers yet</strong>Open Discover, enter your local network prefix once, and scan for units.<br><br><button class="button primary" id="empty-discover">Discover units</button></div>`}
     `;
@@ -513,7 +512,6 @@
     app.innerHTML = `
       <div class="back-row"><button class="back-button" id="back-units" type="button">← All units</button><span class="status-pill ${device.online ? "online" : "offline"}" id="device-online">${device.online ? "Online" : "Offline"}</span></div>
       <div class="device-title">${escapeHtml(device.name)}</div>
-      <div class="unit-address" style="margin-bottom:12px">${escapeHtml(device.baseUrl)}</div>
       <section class="card thermostat-card">
         <div class="thermostat-top"><div class="current-label">Current temperature</div><div class="current-value" id="current-temp">${usesFahrenheit(device.temperatureUnit) ? "--°F" : "--.-°C"}</div></div>
         <div class="thermostat-dial">
@@ -546,7 +544,7 @@
           <button id="toggle-display" class="button icon-only icon-pair-button" type="button" title="Toggle Display" aria-label="Toggle Display"><span class="ui-icon-pair"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11,0V4H13V0H11M18.3,2.29L15.24,5.29L16.64,6.71L19.7,3.71L18.3,2.29M5.71,2.29L4.29,3.71L7.29,6.71L8.71,5.29L5.71,2.29M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6M2,9V11H6V9H2M18,9V11H22V9H18Z"/></svg><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6Z"/></svg></span></button>
           <button id="display-celsius" class="button icon-only" type="button" title="Set Display Degree Celsius" aria-label="Set Display Degree Celsius"><svg class="ui-action-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M30 18h-6a2.002 2.002 0 0 1-2-2V6a2.002 2.002 0 0 1 2-2h6v2h-6v10h6Z"/><circle fill="currentColor" cx="18" cy="4" r="2"/><path fill="currentColor" d="M10 20.184V12H8v8.184a3 3 0 1 0 2 0Z"/><path fill="currentColor" d="M9 30a6.993 6.993 0 0 1-5-11.889V7A5 5 0 0 1 14 7v11.111A6.993 6.993 0 0 1 9 30Zm0-26a3.003 3.003 0 0 0-3 3v11.983l-.332.299a5 5 0 1 0 6.664 0L12 18.983V7a3.003 3.003 0 0 0-3-3Z"/></svg></button>
           <button id="display-fahrenheit" class="button icon-only" type="button" title="Set Display Degree Fahrenheit" aria-label="Set Display Degree Fahrenheit"><svg class="ui-action-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M30 6V4h-8v14h2v-6h5v-2h-5V6Z"/><circle fill="currentColor" cx="18" cy="4" r="2"/><path fill="currentColor" d="M10 20.184V12H8v8.184a3 3 0 1 0 2 0Z"/><path fill="currentColor" d="M9 30a6.993 6.993 0 0 1-5-11.889V7A5 5 0 0 1 14 7v11.111A6.993 6.993 0 0 1 9 30Zm0-26a3.003 3.003 0 0 0-3 3v11.983l-.332.299a5 5 0 1 0 6.664 0L12 18.983V7a3.003 3.003 0 0 0-3-3Z"/></svg></button>
-          <button id="beeper-toggle" class="button icon-only beeper-button" type="button" data-beeper-state="on" aria-pressed="true" title="Beeper: On — click to turn off" aria-label="Beeper On; click to turn off">
+          <button id="beeper-toggle" class="button icon-only climate-beeper-button" type="button" data-beeper-state="on" aria-pressed="true" title="Beeper: On — click to turn off" aria-label="Beeper On; click to turn off">
             <svg class="ui-action-icon beeper-icon-on" viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="13"/><path d="M8.5 13h4l5-4v14l-5-4h-4z"/><path d="M20.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/><path d="M22.8 10.5c3 3.15 3 7.85 0 11"/></svg>
             <svg class="ui-action-icon beeper-icon-off" viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="13"/><path d="M8.5 13h4l5-4v14l-5-4h-4z"/><path d="M20.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/><path d="M22.8 10.5c3 3.15 3 7.85 0 11"/><path d="M6.7 6.7L25.3 25.3" stroke-width="2.2"/></svg>
           </button>
