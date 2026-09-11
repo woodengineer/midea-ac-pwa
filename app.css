@@ -68,7 +68,7 @@ button:disabled { cursor: wait; opacity: .55; }
 .card-body { padding: 16px; }
 
 .unit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
-.unit-card { min-height: 150px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.unit-card { min-height: 0; padding: 16px; display: flex; flex-direction: column; gap: 7px; }
 .unit-card-clickable { cursor: pointer; transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
 .unit-card-clickable:hover { border-color: var(--primary); }
 .unit-card-clickable:active { transform: translateY(1px); }
@@ -79,8 +79,8 @@ button:disabled { cursor: wait; opacity: .55; }
 .status-pill { font-size: .72rem; padding: 4px 8px; border-radius: 999px; background: var(--surface-high); color: var(--muted); white-space: nowrap; }
 .status-pill.online { color: var(--ok); }
 .status-pill.offline { color: var(--danger); }
-.unit-temp { font-size: 2rem; font-weight: 600; line-height: 1; margin-top: 2px; }
-.unit-summary-row { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
+.unit-temp { font-size: 2rem; font-weight: 600; line-height: 1; margin-top: 0; margin-bottom: 0; }
+.unit-summary-row { margin-top: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
 .unit-summary { color: var(--muted); min-height: 20px; display: flex; align-items: center; }
 .unit-refresh-button { margin-left: auto; flex: 0 0 auto; }
 .empty-state { text-align: center; padding: 34px 18px; color: var(--muted); }

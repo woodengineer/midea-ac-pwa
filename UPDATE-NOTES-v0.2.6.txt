@@ -1,0 +1,9 @@
+Midea AC PWA v0.2.6 — Tile spacing adjustment
+
+Dashboard tile layout only:
+- Removed the flex auto-spacing that pushed the Mode / Set Temperature / Refresh row toward the bottom.
+- Reduced the general vertical gap inside each tile from 10px to 7px.
+- Removed extra top margin on the large current-temperature value.
+- Kept tile padding at 16px on all sides, so bottom spacing now matches the top spacing.
+- Refresh remains aligned at the far right of the Mode / Set Temperature row.
+- No discovery, manual add, REST, Temperature Unit, or controller logic changed.
