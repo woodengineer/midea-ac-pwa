@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.9";
+  const APP_VERSION = "0.2.10";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -119,6 +119,18 @@
     const response = await fetchWithTimeout(url, { method: "POST" }, REQUEST_TIMEOUT);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return true;
+  }
+
+  async function postActionFirst(baseUrl, domain, names, action, params = {}) {
+    let lastError = null;
+    for (const name of names) {
+      try {
+        return await postAction(baseUrl, domain, name, action, params);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("Entity unavailable");
   }
 
   async function tryEntity(baseUrl, domain, names, detail = false, timeout = REQUEST_TIMEOUT) {
@@ -530,8 +542,20 @@
         <div class="choice-panel" id="swing-menu">
           ${["OFF","VERTICAL","HORIZONTAL","BOTH"].map(v => `<button class="choice" data-swing="${v}" type="button">${human(v)}</button>`).join("")}
         </div>
-        <div class="function-row"><button id="toggle-display" class="button icon-only icon-pair-button" type="button" title="Toggle Display" aria-label="Toggle Display"><span class="ui-icon-pair"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11,0V4H13V0H11M18.3,2.29L15.24,5.29L16.64,6.71L19.7,3.71L18.3,2.29M5.71,2.29L4.29,3.71L7.29,6.71L8.71,5.29L5.71,2.29M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6M2,9V11H6V9H2M18,9V11H22V9H18Z"/></svg><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6Z"/></svg></span></button><button id="refresh-detail" class="button icon-only" type="button" title="Refresh" aria-label="Refresh"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z"/></svg></button><button id="open-native" class="button" type="button">Open device page</button></div>
-        <div class="device-status" id="device-status">Connecting…</div>
+        <div class="function-row">
+          <button id="toggle-display" class="button icon-only icon-pair-button" type="button" title="Toggle Display" aria-label="Toggle Display"><span class="ui-icon-pair"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M11,0V4H13V0H11M18.3,2.29L15.24,5.29L16.64,6.71L19.7,3.71L18.3,2.29M5.71,2.29L4.29,3.71L7.29,6.71L8.71,5.29L5.71,2.29M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6M2,9V11H6V9H2M18,9V11H22V9H18Z"/></svg><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6Z"/></svg></span></button>
+          <button id="display-celsius" class="button icon-only" type="button" title="Set Display Degree Celsius" aria-label="Set Display Degree Celsius"><svg class="ui-action-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M30 18h-6a2.002 2.002 0 0 1-2-2V6a2.002 2.002 0 0 1 2-2h6v2h-6v10h6Z"/><circle fill="currentColor" cx="18" cy="4" r="2"/><path fill="currentColor" d="M10 20.184V12H8v8.184a3 3 0 1 0 2 0Z"/><path fill="currentColor" d="M9 30a6.993 6.993 0 0 1-5-11.889V7A5 5 0 0 1 14 7v11.111A6.993 6.993 0 0 1 9 30Zm0-26a3.003 3.003 0 0 0-3 3v11.983l-.332.299a5 5 0 1 0 6.664 0L12 18.983V7a3.003 3.003 0 0 0-3-3Z"/></svg></button>
+          <button id="display-fahrenheit" class="button icon-only" type="button" title="Set Display Degree Fahrenheit" aria-label="Set Display Degree Fahrenheit"><svg class="ui-action-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M30 6V4h-8v14h2v-6h5v-2h-5V6Z"/><circle fill="currentColor" cx="18" cy="4" r="2"/><path fill="currentColor" d="M10 20.184V12H8v8.184a3 3 0 1 0 2 0Z"/><path fill="currentColor" d="M9 30a6.993 6.993 0 0 1-5-11.889V7A5 5 0 0 1 14 7v11.111A6.993 6.993 0 0 1 9 30Zm0-26a3.003 3.003 0 0 0-3 3v11.983l-.332.299a5 5 0 1 0 6.664 0L12 18.983V7a3.003 3.003 0 0 0-3-3Z"/></svg></button>
+          <button id="beeper-toggle" class="button icon-only beeper-button" type="button" data-beeper-state="on" aria-pressed="true" title="Beeper: On — click to turn off" aria-label="Beeper On; click to turn off">
+            <svg class="ui-action-icon beeper-icon-on" viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="13"/><path d="M8.5 13h4l5-4v14l-5-4h-4z"/><path d="M20.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/><path d="M22.8 10.5c3 3.15 3 7.85 0 11"/></svg>
+            <svg class="ui-action-icon beeper-icon-off" viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="13"/><path d="M8.5 13h4l5-4v14l-5-4h-4z"/><path d="M20.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/><path d="M22.8 10.5c3 3.15 3 7.85 0 11"/><path d="M6.7 6.7L25.3 25.3" stroke-width="2.2"/></svg>
+          </button>
+          <button id="refresh-detail" class="button icon-only" type="button" title="Refresh" aria-label="Refresh"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z"/></svg></button>
+        </div>
+        <div class="device-status-row">
+          <button id="open-native" class="button" type="button">Open device page</button>
+          <div class="device-status" id="device-status">Connecting…</div>
+        </div>
       </section>`;
 
     document.getElementById("back-units").addEventListener("click", () => setRoute("dashboard"));
@@ -540,6 +564,57 @@
       const id = b.dataset.menu;
       app.querySelectorAll(".choice-panel").forEach(p => p.classList.toggle("open", p.id === id && !p.classList.contains("open")));
     }));
+
+    let beeperEnabled = true;
+    let beeperAvailable = true;
+    const beeperButton = document.getElementById("beeper-toggle");
+
+    function parseSwitchState(payload, fallback = true) {
+      const raw = payload && payload.value !== undefined
+        ? payload.value
+        : (payload && payload.state !== undefined ? payload.state : fallback);
+
+      if (typeof raw === "boolean") return raw;
+      if (typeof raw === "number") return raw !== 0;
+
+      const value = String(raw).trim().toUpperCase();
+      if (["ON", "TRUE", "1", "ENABLED"].includes(value)) return true;
+      if (["OFF", "FALSE", "0", "DISABLED"].includes(value)) return false;
+      return fallback;
+    }
+
+    function renderBeeperState(enabled) {
+      beeperEnabled = !!enabled;
+      beeperAvailable = true;
+      beeperButton.disabled = false;
+      beeperButton.dataset.beeperState = beeperEnabled ? "on" : "off";
+      beeperButton.setAttribute("aria-pressed", beeperEnabled ? "true" : "false");
+      if (beeperEnabled) {
+        beeperButton.title = "Beeper: On — click to turn off";
+        beeperButton.setAttribute("aria-label", "Beeper On; click to turn off");
+      } else {
+        beeperButton.title = "Beeper: Off — click to turn on";
+        beeperButton.setAttribute("aria-label", "Beeper Off; click to turn on");
+      }
+    }
+
+    async function loadBeeperState() {
+      try {
+        const payload = await tryEntity(
+          device.baseUrl,
+          "switch",
+          ["Beeper", "midea_beeper"],
+          false,
+          REQUEST_TIMEOUT
+        );
+        renderBeeperState(parseSwitchState(payload, beeperEnabled));
+      } catch (_) {
+        beeperAvailable = false;
+        beeperButton.disabled = true;
+        beeperButton.title = "Beeper control unavailable on this controller";
+        beeperButton.setAttribute("aria-label", "Beeper control unavailable");
+      }
+    }
 
     async function command(label, fn) {
       const status = document.getElementById("device-status");
@@ -569,7 +644,42 @@
     app.querySelector("[data-boost]").addEventListener("click", () => command("Toggling Boost…", () => postAction(device.baseUrl, "button", "AC Preset: Boost", "press")));
     app.querySelectorAll("[data-swing]").forEach(b => b.addEventListener("click", () => command(`Setting swing ${human(b.dataset.swing)}…`, () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { swing_mode: b.dataset.swing }))));
     document.getElementById("toggle-display").addEventListener("click", () => command("Toggling display…", () => postAction(device.baseUrl, "button", "Turn off LED", "press")));
-    document.getElementById("refresh-detail").addEventListener("click", loadDetail);
+
+    document.getElementById("display-celsius").addEventListener("click", () =>
+      command("Setting indoor display to Celsius…", () =>
+        postActionFirst(device.baseUrl, "button", ["Set AC Display Celsius", "ac_display_celsius"], "press")
+      )
+    );
+
+    document.getElementById("display-fahrenheit").addEventListener("click", () =>
+      command("Setting indoor display to Fahrenheit…", () =>
+        postActionFirst(device.baseUrl, "button", ["Set AC Display Fahrenheit", "ac_display_fahrenheit"], "press")
+      )
+    );
+
+    beeperButton.addEventListener("click", () => {
+      if (!beeperAvailable) return;
+      const nextState = !beeperEnabled;
+      command(
+        nextState ? "Turning beeper feedback on…" : "Turning beeper feedback off…",
+        async () => {
+          await postActionFirst(
+            device.baseUrl,
+            "switch",
+            ["Beeper", "midea_beeper"],
+            nextState ? "turn_on" : "turn_off"
+          );
+          renderBeeperState(nextState);
+        }
+      );
+    });
+
+    document.getElementById("refresh-detail").addEventListener("click", async () => {
+      await Promise.allSettled([loadDetail(false), loadBeeperState()]);
+      if (route.name === "device" && route.deviceId === device.id) {
+        scheduleDetailRefresh();
+      }
+    });
     document.getElementById("temp-down").addEventListener("click", () => adjustTemp(-1));
     document.getElementById("temp-up").addEventListener("click", () => adjustTemp(1));
 
@@ -721,6 +831,7 @@
     // This is intentionally not part of the 8-second climate polling loop.
     await refreshDeviceTemperatureUnit(device);
     if (device.climate) renderClimate(device.climate);
+    await loadBeeperState();
     await loadDetail(true);
   }
 
