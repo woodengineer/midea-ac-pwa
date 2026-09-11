@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.3";
+  const APP_VERSION = "0.2.4";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -15,6 +15,10 @@
   const OFFLINE_FAILURE_THRESHOLD = 3;
   const DETAIL_REFRESH_INTERVAL = 8000;
   const COMMAND_VERIFY_DELAY = 2000;
+
+  const ICON_LED_ON = `<svg class='ui-action-icon' viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path fill='currentColor' d='M11,0V4H13V0H11M18.3,2.29L15.24,5.29L16.64,6.71L19.7,3.71L18.3,2.29M5.71,2.29L4.29,3.71L7.29,6.71L8.71,5.29L5.71,2.29M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6M2,9V11H6V9H2M18,9V11H22V9H18Z'/></svg>`;
+  const ICON_LED_OFF = `<svg class='ui-action-icon' viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path fill='currentColor' d='M12,6A4,4 0 0,0 8,10V16H6V18H9V23H11V18H13V23H15V18H18V16H16V10A4,4 0 0,0 12,6Z'/></svg>`;
+  const ICON_REFRESH = `<svg class='ui-action-icon' viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path fill='currentColor' d='M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z'/></svg>`;
 
   const app = document.getElementById("app");
   const toast = document.getElementById("toast");
@@ -454,7 +458,7 @@
           <div class="unit-summary">${escapeHtml(summary)}</div>
           <div class="unit-card-actions">
             <button class="button primary small" type="button" data-open-device="${escapeHtml(device.id)}">Control</button>
-            <button class="button small" type="button" data-refresh-device="${escapeHtml(device.id)}">Refresh</button>
+            <button class="button small icon-only" type="button" data-refresh-device="${escapeHtml(device.id)}" title="Refresh" aria-label="Refresh ${escapeHtml(device.name)}">${ICON_REFRESH}</button>
           </div>
         </article>`;
     }).join("");
@@ -512,7 +516,7 @@
         <div class="choice-panel" id="swing-menu">
           ${["OFF","VERTICAL","HORIZONTAL","BOTH"].map(v => `<button class="choice" data-swing="${v}" type="button">${human(v)}</button>`).join("")}
         </div>
-        <div class="function-row"><button id="toggle-display" class="button" type="button">Toggle Display</button><button id="refresh-detail" class="button" type="button">Refresh</button><button id="open-native" class="button" type="button">Open device page</button></div>
+        <div class="function-row"><button id="toggle-display" class="button icon-only icon-pair-button" type="button" title="Toggle Display" aria-label="Toggle Display"><span class="ui-icon-pair">${ICON_LED_ON}${ICON_LED_OFF}</span></button><button id="refresh-detail" class="button icon-only" type="button" title="Refresh" aria-label="Refresh">${ICON_REFRESH}</button><button id="open-native" class="button" type="button">Open device page</button></div>
         <div class="device-status" id="device-status">Connecting…</div>
       </section>`;
 
