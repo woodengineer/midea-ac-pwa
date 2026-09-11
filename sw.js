@@ -1,9 +1,9 @@
-const CACHE = "midea-ac-pwa-v0.2.4-fixed";
+const CACHE = "midea-ac-pwa-v0.2.5";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./app.css?v=0.2.4-fixed",
-  "./app.js?v=0.2.4-fixed",
+  "./app.css?v=0.2.5",
+  "./app.js?v=0.2.5",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

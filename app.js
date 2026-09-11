@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.4";
+  const APP_VERSION = "0.2.5";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -445,29 +445,47 @@
         ? `${human(mode)}${mode !== "OFF" && Number.isFinite(Number(c.target_temperature)) ? " → " + formatTargetTemp(c.target_temperature, device.temperatureUnit, true) : ""}`
         : "Controller unavailable";
       return `
-        <article class="card unit-card" data-device-id="${escapeHtml(device.id)}">
+        <article class="card unit-card unit-card-clickable"
+                 data-open-device="${escapeHtml(device.id)}"
+                 role="button"
+                 tabindex="0"
+                 aria-label="Open controls for ${escapeHtml(device.name)}">
           <div class="unit-card-head">
             <div><div class="unit-name">${escapeHtml(device.name)}</div><div class="unit-address">${escapeHtml(device.deviceName || device.baseUrl.replace(/^https?:\/\//, ""))}${device.ipAddress ? " · " + escapeHtml(device.ipAddress) : ""}</div></div>
             <span class="status-pill ${status}">${device.online ? "Online" : "Offline"}</span>
           </div>
           <div class="unit-temp">${device.online ? formatTemp(c.current_temperature, device.temperatureUnit) : (usesFahrenheit(device.temperatureUnit) ? "--°F" : "--.-°C")}</div>
-          <div class="unit-summary">${escapeHtml(summary)}</div>
-          <div class="unit-card-actions">
-            <button class="button primary small" type="button" data-open-device="${escapeHtml(device.id)}">Control</button>
-            <button class="button small icon-only" type="button" data-refresh-device="${escapeHtml(device.id)}" title="Refresh" aria-label="Refresh ${escapeHtml(device.name)}"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z"/></svg></button>
+          <div class="unit-summary-row">
+            <div class="unit-summary">${escapeHtml(summary)}</div>
+            <button class="button small icon-only unit-refresh-button"
+                    type="button"
+                    data-refresh-device="${escapeHtml(device.id)}"
+                    title="Refresh"
+                    aria-label="Refresh ${escapeHtml(device.name)}"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z"/></svg></button>
           </div>
         </article>`;
     }).join("");
 
     app.innerHTML = `
       <h1 class="section-title">Air Conditioners</h1>
-      <p class="section-copy">All control traffic stays on your local network.</p>
       ${cards ? `<div class="unit-grid">${cards}</div>` : `
         <div class="card empty-state"><strong>No AC controllers yet</strong>Open Discover, enter your local network prefix once, and scan for units.<br><br><button class="button primary" id="empty-discover">Discover units</button></div>`}
     `;
 
-    app.querySelectorAll("[data-open-device]").forEach(b => b.addEventListener("click", () => setRoute("device", b.dataset.openDevice)));
-    app.querySelectorAll("[data-refresh-device]").forEach(b => b.addEventListener("click", async () => {
+    app.querySelectorAll("[data-open-device]").forEach(card => {
+      card.addEventListener("click", event => {
+        if (event.target.closest("[data-refresh-device]")) return;
+        setRoute("device", card.dataset.openDevice);
+      });
+      card.addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (event.target.closest("[data-refresh-device]")) return;
+        event.preventDefault();
+        setRoute("device", card.dataset.openDevice);
+      });
+    });
+    app.querySelectorAll("[data-refresh-device]").forEach(b => b.addEventListener("click", async event => {
+      event.stopPropagation();
       const d = state.devices.find(x => x.id === b.dataset.refreshDevice); if (!d) return;
       b.disabled = true; await refreshDevice(d); renderDashboard();
     }));
