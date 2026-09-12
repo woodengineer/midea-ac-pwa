@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.15
+# Midea AC Control PWA v0.2.16
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -342,3 +342,10 @@ device identities.
 - The Open Device Page icon is aligned at the far right of the FUNCTIONS row.
 - The underlying status element remains available to the PWA logic but is
   visually hidden.
+
+
+## v0.2.16 Friendly Name layout
+
+- Centered the Friendly Name on the individual-unit page.
+- Added 12px of spacing below the Friendly Name before the thermostat card.
+- Thermostat/gauge geometry and controls are unchanged.
