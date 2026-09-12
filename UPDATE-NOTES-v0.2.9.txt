@@ -1,8 +1,0 @@
-Midea AC PWA v0.2.9 — Equal current-temperature spacing
-
-Layout-only change:
-- Removed the generic 5px vertical flex gap from the tile.
-- Current temperature now has exactly 5px margin above and 5px below.
-- Outer tile padding remains 16px.
-- Mode / Set Temperature / Refresh row remains unchanged.
-- No discovery, manual add, REST, Temperature Unit, or controller logic changed.

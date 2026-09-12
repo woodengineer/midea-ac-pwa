@@ -1,5 +1,0 @@
-Midea AC PWA v0.2.8
-
-Layout-only change:
-- Moved the large current-temperature value down by 5px.
-- No other tile spacing or functionality changed.
