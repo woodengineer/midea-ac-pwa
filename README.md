@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.14
+# Midea AC Control PWA v0.2.15
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -332,3 +332,13 @@ device identities.
 - Kept the wide Beeper button itself unchanged.
 - Increased the actually rendered speaker/wave symbol by 50%.
 - Beeper state and REST behavior are unchanged.
+
+
+## v0.2.15 Open device icon
+
+- Removed the visible Connected/Disconnected text below the FUNCTIONS row.
+- Moved **Open device page** into the FUNCTIONS row.
+- Replaced the text button with an icon-only external/open-page button.
+- The Open Device Page icon is aligned at the far right of the FUNCTIONS row.
+- The underlying status element remains available to the PWA logic but is
+  visually hidden.

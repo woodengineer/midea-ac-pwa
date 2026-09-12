@@ -133,9 +133,8 @@ button:disabled { cursor: wait; opacity: .55; }
 .choice-panel.open { display: flex; }
 .choice.active { border-color: var(--primary); background: var(--primary-soft); }
 .function-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--outline); }
-.device-status-row { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.device-status-row > .button { flex: 0 0 auto; }
-.device-status { margin: 0 0 0 auto; min-width: 0; color: var(--muted); font-size: .82rem; text-align: right; }
+.open-native-icon { margin-left: auto; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
 .form-row { display: grid; gap: 6px; margin-bottom: 14px; }
 .form-row label { font-size: .82rem; color: var(--muted); }

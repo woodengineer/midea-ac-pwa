@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.14";
+  const APP_VERSION = "0.2.15";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -554,11 +554,9 @@
             </svg>
           </button>
           <button id="refresh-detail" class="button icon-only" type="button" title="Refresh" aria-label="Refresh"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z"/></svg></button>
+          <button id="open-native" class="button icon-only open-native-icon" type="button" title="Open device page" aria-label="Open device page"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14 3v2h3.59l-9.3 9.29 1.42 1.42L19 6.41V10h2V3h-7ZM19 19H5V5h6V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6h-2v6Z"/></svg></button>
         </div>
-        <div class="device-status-row">
-          <button id="open-native" class="button" type="button">Open device page</button>
-          <div class="device-status" id="device-status">Connecting…</div>
-        </div>
+        <div class="device-status sr-only" id="device-status" aria-live="polite">Connecting…</div>
       </section>`;
 
     document.getElementById("back-units").addEventListener("click", () => setRoute("dashboard"));
