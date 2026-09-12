@@ -59,9 +59,9 @@ button:disabled { cursor: wait; opacity: .55; }
   width: 66px;
   min-width: 66px;
 }
-.climate-beeper-button .beeper-state-icon {
-  width: 48px;
-  height: 32px;
+.button.icon-only.climate-beeper-button .beeper-state-icon {
+  width: 36px;
+  height: 24px;
 }
 .climate-beeper-button .beeper-off-slash {
   display: none;

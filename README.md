@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.13
+# Midea AC Control PWA v0.2.14
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -322,4 +322,13 @@ device identities.
 - Kept the wide Beeper button at the existing size.
 - Increased only the speaker/wave SVG from 42×28 px to 48×32 px so it visually
   matches the adjacent FUNCTIONS icons more closely.
+- Beeper state and REST behavior are unchanged.
+
+
+## v0.2.14 Beeper glyph sizing fix
+
+- Fixed a CSS-specificity issue that was keeping the Beeper SVG at the generic
+  24×24 icon size.
+- Kept the wide Beeper button itself unchanged.
+- Increased the actually rendered speaker/wave symbol by 50%.
 - Beeper state and REST behavior are unchanged.
