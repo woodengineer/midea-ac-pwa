@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.11";
+  const APP_VERSION = "0.2.12";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -545,8 +545,13 @@
           <button id="display-celsius" class="button icon-only" type="button" title="Set Display Degree Celsius" aria-label="Set Display Degree Celsius"><svg class="ui-action-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M30 18h-6a2.002 2.002 0 0 1-2-2V6a2.002 2.002 0 0 1 2-2h6v2h-6v10h6Z"/><circle fill="currentColor" cx="18" cy="4" r="2"/><path fill="currentColor" d="M10 20.184V12H8v8.184a3 3 0 1 0 2 0Z"/><path fill="currentColor" d="M9 30a6.993 6.993 0 0 1-5-11.889V7A5 5 0 0 1 14 7v11.111A6.993 6.993 0 0 1 9 30Zm0-26a3.003 3.003 0 0 0-3 3v11.983l-.332.299a5 5 0 1 0 6.664 0L12 18.983V7a3.003 3.003 0 0 0-3-3Z"/></svg></button>
           <button id="display-fahrenheit" class="button icon-only" type="button" title="Set Display Degree Fahrenheit" aria-label="Set Display Degree Fahrenheit"><svg class="ui-action-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M30 6V4h-8v14h2v-6h5v-2h-5V6Z"/><circle fill="currentColor" cx="18" cy="4" r="2"/><path fill="currentColor" d="M10 20.184V12H8v8.184a3 3 0 1 0 2 0Z"/><path fill="currentColor" d="M9 30a6.993 6.993 0 0 1-5-11.889V7A5 5 0 0 1 14 7v11.111A6.993 6.993 0 0 1 9 30Zm0-26a3.003 3.003 0 0 0-3 3v11.983l-.332.299a5 5 0 1 0 6.664 0L12 18.983V7a3.003 3.003 0 0 0-3-3Z"/></svg></button>
           <button id="beeper-toggle" class="button icon-only climate-beeper-button" type="button" data-beeper-state="on" aria-pressed="true" title="Beeper: On — click to turn off" aria-label="Beeper On; click to turn off">
-            <svg class="ui-action-icon beeper-icon-on" viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="13"/><path d="M8.5 13h4l5-4v14l-5-4h-4z"/><path d="M20.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/><path d="M22.8 10.5c3 3.15 3 7.85 0 11"/></svg>
-            <svg class="ui-action-icon beeper-icon-off" viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="13"/><path d="M8.5 13h4l5-4v14l-5-4h-4z"/><path d="M20.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/><path d="M22.8 10.5c3 3.15 3 7.85 0 11"/><path d="M6.7 6.7L25.3 25.3" stroke-width="2.2"/></svg>
+            <svg class="ui-action-icon beeper-state-icon" viewBox="0 0 48 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="24" cy="16" r="13"/>
+              <path d="M16.5 13h4l5-4v14l-5-4h-4z"/>
+              <path d="M28.1 13.1c1.55 1.65 1.55 4.15 0 5.8"/>
+              <path d="M30.8 10.5c3 3.15 3 7.85 0 11"/>
+              <path class="beeper-off-slash" d="M14.7 6.7L33.3 25.3" stroke-width="2.2"/>
+            </svg>
           </button>
           <button id="refresh-detail" class="button icon-only" type="button" title="Refresh" aria-label="Refresh"><svg class="ui-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.07 4.93a9.9 9.9 0 0 0-3.18-2.14A9.95 9.95 0 0 0 12 2v2c1.08 0 2.13.21 3.11.63.95.4 1.81.98 2.54 1.71s1.31 1.59 1.72 2.54c.42.99.63 2.03.63 3.11s-.21 2.13-.63 3.11c-.4.95-.98 1.81-1.72 2.54-.17.17-.34.32-.52.48L15 15.99v6h6l-2.45-2.45c.18-.15.36-.31.52-.48.92-.92 1.64-1.99 2.14-3.18.52-1.23.79-2.54.79-3.89s-.26-2.66-.79-3.89a9.9 9.9 0 0 0-2.14-3.18ZM4.93 19.07c.92.92 1.99 1.64 3.18 2.14 1.23.52 2.54.79 3.89.79v-2a7.9 7.9 0 0 1-3.11-.63c-.95-.4-1.81-.98-2.54-1.71s-1.31-1.59-1.72-2.54c-.42-.99-.63-2.03-.63-3.11s.21-2.13.63-3.11c.4-.95.98-1.81 1.72-2.54.17-.17.34-.32.52-.48L9 8.01V2H3l2.45 2.45c-.18.15-.36.31-.52.48-.92.92-1.64 1.99-2.14 3.18C2.27 9.34 2 10.65 2 12s.26 2.66.79 3.89c.5 1.19 1.22 2.26 2.14 3.18Z"/></svg></button>
         </div>
