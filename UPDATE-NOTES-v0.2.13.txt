@@ -1,0 +1,5 @@
+Midea AC PWA v0.2.13
+
+- Beeper button remains 66px wide.
+- Increased the internal Beeper SVG from 42x28px to 48x32px.
+- No functional behavior changed.

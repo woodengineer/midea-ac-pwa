@@ -1,0 +1,8 @@
+Midea AC PWA v0.2.12 — Beeper icon correction
+
+- Beeper is now one single wide stateful icon/button.
+- ON state: speaker with sound waves.
+- OFF state: the exact same icon with a diagonal strike-through added.
+- The PWA no longer swaps between two separate Beeper SVGs.
+- Beeper REST/state logic is unchanged.
+- No other PWA behavior changed.

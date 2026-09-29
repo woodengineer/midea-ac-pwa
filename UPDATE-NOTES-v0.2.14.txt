@@ -1,0 +1,6 @@
+Midea AC PWA v0.2.14
+
+- Fixed CSS specificity that was overriding the Beeper SVG size.
+- Wide Beeper button remains unchanged.
+- Effective Beeper speaker/wave glyph is now 50% larger.
+- No functional behavior changed.

@@ -1,0 +1,21 @@
+Midea AC PWA v0.2.10 — Individual unit FUNCTIONS/status-row update
+
+Individual unit page:
+- Moved "Open device page" out of the FUNCTIONS row.
+- New bottom status row:
+    Open device page  [left]
+    Connected/status  [right]
+- FUNCTIONS row now matches the ESPHome device page:
+    1. Toggle Display (combined LED ON/OFF icon)
+    2. Set Display Degree Celsius
+    3. Set Display Degree Fahrenheit
+    4. Beeper ON/OFF (stateful icon)
+    5. Refresh
+- Beeper state is read from /switch/Beeper when the unit page opens and when
+  Refresh is pressed.
+- If a controller does not expose the Beeper switch, the Beeper button is
+  disabled without affecting the rest of the page.
+- Celsius/Fahrenheit function buttons control the indoor unit's physical display
+  unit only; they do not change the PWA Temperature Unit presentation preference.
+- Automatic 8-second detail polling remains climate-only.
+- Dashboard tile layout from v0.2.9 is unchanged.

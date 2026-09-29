@@ -1,0 +1,8 @@
+Midea AC PWA v0.2.17
+
+- Added finger/mouse/pen adjustment to the individual-unit thermostat dial.
+- Target temperature and marker preview live while dragging.
+- Sends one climate REST command when released.
+- Existing +/- temperature buttons remain unchanged.
+- Fahrenheit uses whole-degree display steps mapped to valid Celsius setpoints.
+- Normal detail polling pauses during a drag.

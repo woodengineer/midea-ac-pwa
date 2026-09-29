@@ -1,0 +1,7 @@
+Midea AC PWA v0.2.15
+
+- Removed visible Connected text below the FUNCTIONS row.
+- Moved Open Device Page into the FUNCTIONS row.
+- Changed Open Device Page to an icon-only external-link button.
+- Aligned Open Device Page at the far right.
+- Retained hidden status element for existing command/error logic.

@@ -1,4 +1,4 @@
-# Midea AC Control PWA v0.2.16
+# Midea AC Control PWA v0.2.17
 
 A lightweight installable Progressive Web App for discovering and controlling
 multiple local ESPHome/Midea AC controllers.
@@ -349,3 +349,20 @@ device identities.
 - Centered the Friendly Name on the individual-unit page.
 - Added 12px of spacing below the Friendly Name before the thermostat card.
 - Thermostat/gauge geometry and controls are unchanged.
+
+
+## v0.2.17 Touch-adjustable thermostat dial
+
+- The individual-unit thermostat arc can now be adjusted directly with a
+  finger, pen, or mouse.
+- The target temperature and target marker update live during the drag.
+- Only one REST climate command is sent when the pointer is released.
+- The existing `+` and `-` temperature buttons are unchanged.
+- Celsius continues to use valid Midea/ESPHome temperature increments.
+- Fahrenheit dial movement uses whole-degree °F presentation and maps the
+  result to the nearest valid Celsius setpoint, matching the existing buttons.
+- Normal 8-second climate polling pauses while the dial is being dragged.
+- The dial also supports keyboard Arrow, Home, and End keys.
+
+No discovery, Beeper, display-control, Home Assistant, device identity, or
+dashboard behavior changed.

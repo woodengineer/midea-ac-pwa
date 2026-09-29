@@ -1,0 +1,8 @@
+Midea AC PWA v0.2.11 — UI cleanup
+
+1. Removed the "Air Conditioners" header from the main dashboard.
+2. Removed the raw controller URL/IP address line from the individual unit page.
+3. Beeper ON/OFF uses the same SVG artwork as the ESPHome webserver interface
+   and is rendered at the same 27x27 icon size.
+
+No discovery, manual add, REST, polling, Temperature Unit, or controller logic changed.

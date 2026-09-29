@@ -1,0 +1,5 @@
+Midea AC PWA v0.2.16
+
+- Centered the individual-unit Friendly Name.
+- Added 12px bottom spacing below the Friendly Name.
+- No thermostat/control logic changed.

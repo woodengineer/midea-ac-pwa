@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "0.2.16";
+  const APP_VERSION = "0.2.17";
   const STORAGE_KEY = "midea-ac-pwa-state-v1";
   const CLIMATE_NAME = "AC Unit";
   const FRIENDLY_NAME_ENTITY = "Device Friendly Name";
@@ -514,7 +514,14 @@
       <div class="device-title">${escapeHtml(device.name)}</div>
       <section class="card thermostat-card">
         <div class="thermostat-top"><div class="current-label">Current temperature</div><div class="current-value" id="current-temp">${usesFahrenheit(device.temperatureUnit) ? "--°F" : "--.-°C"}</div></div>
-        <div class="thermostat-dial">
+        <div class="thermostat-dial"
+             id="thermostat-dial"
+             role="slider"
+             tabindex="0"
+             aria-label="Target temperature dial"
+             aria-valuemin="17"
+             aria-valuemax="30"
+             aria-valuenow="21">
           <svg class="thermostat-svg" viewBox="0 0 300 258" aria-hidden="true">
             <circle id="arc-track" class="arc track" cx="150" cy="150" r="112"></circle>
             <circle id="arc-zone" class="arc zone" cx="150" cy="150" r="112"></circle>
@@ -569,6 +576,13 @@
     let beeperEnabled = true;
     let beeperAvailable = true;
     const beeperButton = document.getElementById("beeper-toggle");
+
+    const dialEl = document.getElementById("thermostat-dial");
+    let dialDragging = false;
+    let dialPointerId = null;
+    let dialStartTarget = null;
+    let dialPreviewTarget = null;
+    let detailBusy = false;
 
     function parseSwitchState(payload, fallback = true) {
       const raw = payload && payload.value !== undefined
@@ -636,7 +650,13 @@
     }
 
     function setDetailBusy(busy) {
+      detailBusy = !!busy;
       app.querySelectorAll(".thermostat-card button").forEach(b => b.disabled = busy);
+
+      if (dialEl) {
+        dialEl.setAttribute("aria-disabled", busy ? "true" : "false");
+        dialEl.classList.toggle("dial-disabled", busy);
+      }
     }
 
     app.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => command(`Setting ${human(b.dataset.mode)}…`, () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { mode: b.dataset.mode }))));
@@ -684,6 +704,30 @@
     document.getElementById("temp-down").addEventListener("click", () => adjustTemp(-1));
     document.getElementById("temp-up").addEventListener("click", () => adjustTemp(1));
 
+    function normalizeTargetTemperature(requestedCelsius, climate = device.climate || {}) {
+      const step = Number(climate.step) > 0 ? Number(climate.step) : .5;
+      const min = Number.isFinite(Number(climate.min_temp)) ? Number(climate.min_temp) : 17;
+      const max = Number.isFinite(Number(climate.max_temp)) ? Number(climate.max_temp) : 30;
+
+      let target = Math.round(Number(requestedCelsius) / step) * step;
+      target = Math.max(min, Math.min(max, target));
+      return Math.round(target * 10) / 10;
+    }
+
+    function sendTargetTemperature(target) {
+      const normalized = normalizeTargetTemperature(target);
+      return command(
+        `Setting target ${formatTargetTemp(normalized, device.temperatureUnit, true)}…`,
+        () => postAction(
+          device.baseUrl,
+          "climate",
+          CLIMATE_NAME,
+          "set",
+          { target_temperature: normalized }
+        )
+      );
+    }
+
     function adjustTemp(direction) {
       const c = device.climate || {};
       const step = Number(c.step) > 0 ? Number(c.step) : .5;
@@ -700,16 +744,205 @@
         requestedCelsius = current + direction * step;
       }
 
-      let target = Math.round(requestedCelsius / step) * step;
-      if (Number.isFinite(Number(c.min_temp))) target = Math.max(target, Number(c.min_temp));
-      if (Number.isFinite(Number(c.max_temp))) target = Math.min(target, Number(c.max_temp));
-      target = Math.round(target * 10) / 10;
-
-      command(
-        `Setting target ${formatTargetTemp(target, device.temperatureUnit, true)}…`,
-        () => postAction(device.baseUrl, "climate", CLIMATE_NAME, "set", { target_temperature: target })
-      );
+      sendTargetTemperature(requestedCelsius);
     }
+
+    function updateDialAccessibility(target, climate = device.climate || {}) {
+      if (!dialEl) return;
+
+      const minC = Number.isFinite(Number(climate.min_temp)) ? Number(climate.min_temp) : 17;
+      const maxC = Number.isFinite(Number(climate.max_temp)) ? Number(climate.max_temp) : 30;
+      const targetC = Number(target);
+
+      if (usesFahrenheit(device.temperatureUnit)) {
+        const minF = Math.round(celsiusToFahrenheit(minC));
+        const maxF = Math.round(celsiusToFahrenheit(maxC));
+        const targetF = Math.round(celsiusToFahrenheit(targetC));
+
+        dialEl.setAttribute("aria-valuemin", String(minF));
+        dialEl.setAttribute("aria-valuemax", String(maxF));
+        dialEl.setAttribute("aria-valuenow", String(targetF));
+        dialEl.setAttribute("aria-valuetext", `${targetF} °F`);
+      } else {
+        dialEl.setAttribute("aria-valuemin", String(minC));
+        dialEl.setAttribute("aria-valuemax", String(maxC));
+        dialEl.setAttribute("aria-valuenow", String(targetC));
+        dialEl.setAttribute(
+          "aria-valuetext",
+          `${formatTargetTemp(targetC, device.temperatureUnit, false)} °C`
+        );
+      }
+    }
+
+    function previewTargetTemperature(target) {
+      const normalized = normalizeTargetTemperature(target);
+      document.getElementById("target-temp").textContent =
+        formatTargetTemp(normalized, device.temperatureUnit, false);
+
+      const targetUnit = document.getElementById("target-unit");
+      if (targetUnit) targetUnit.textContent = temperatureUnitSymbol(device.temperatureUnit);
+
+      updateDialAccessibility(normalized);
+
+      const previewClimate = Object.assign(
+        {},
+        device.climate || {},
+        { target_temperature: normalized }
+      );
+      updateArc(previewClimate);
+    }
+
+    function dialFractionFromPointer(event) {
+      if (!dialEl) return NaN;
+
+      const rect = dialEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return NaN;
+
+      // Convert browser coordinates into the SVG's 300 x 258 coordinate system.
+      const x = ((event.clientX - rect.left) / rect.width) * 300;
+      const y = ((event.clientY - rect.top) / rect.height) * 258;
+
+      // The thermostat arc starts at 135 degrees and sweeps clockwise 270 degrees.
+      let angle = Math.atan2(y - 150, x - 150) * 180 / Math.PI;
+      if (angle < 0) angle += 360;
+
+      let relative = (angle - 135 + 360) % 360;
+
+      // The remaining 90 degrees are the inactive gap at the bottom.
+      // If the finger enters that gap, snap to the nearest end of the arc.
+      if (relative > 270) {
+        const distanceToEnd = relative - 270;
+        const distanceToStart = 360 - relative;
+        relative = distanceToEnd <= distanceToStart ? 270 : 0;
+      }
+
+      return Math.max(0, Math.min(1, relative / 270));
+    }
+
+    function dialTargetFromPointer(event) {
+      const fraction = dialFractionFromPointer(event);
+      if (!Number.isFinite(fraction)) return NaN;
+
+      const c = device.climate || {};
+      const min = Number.isFinite(Number(c.min_temp)) ? Number(c.min_temp) : 17;
+      const max = Number.isFinite(Number(c.max_temp)) ? Number(c.max_temp) : 30;
+
+      let requestedCelsius = min + fraction * (max - min);
+
+      if (usesFahrenheit(device.temperatureUnit)) {
+        // Match the current +/- behavior: whole-degree Fahrenheit presentation,
+        // converted back to the nearest valid Midea Celsius increment.
+        const wholeFahrenheit = Math.round(celsiusToFahrenheit(requestedCelsius));
+        requestedCelsius = fahrenheitToCelsius(wholeFahrenheit);
+      }
+
+      return normalizeTargetTemperature(requestedCelsius, c);
+    }
+
+    function previewDialPointer(event) {
+      const target = dialTargetFromPointer(event);
+      if (!Number.isFinite(target)) return;
+
+      dialPreviewTarget = target;
+      previewTargetTemperature(target);
+    }
+
+    function beginDialDrag(event) {
+      if (!dialEl || detailBusy || dialDragging) return;
+
+      // The +/- buttons remain independent controls.
+      if (event.target?.closest?.(".step-button")) return;
+
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+
+      const current = Number(device.climate?.target_temperature);
+      if (!Number.isFinite(current)) return;
+
+      dialDragging = true;
+      dialPointerId = event.pointerId;
+      dialStartTarget = normalizeTargetTemperature(current);
+      dialPreviewTarget = dialStartTarget;
+      dialEl.classList.add("dial-dragging");
+
+      try {
+        dialEl.setPointerCapture(event.pointerId);
+      } catch (_) {}
+
+      previewDialPointer(event);
+      event.preventDefault();
+    }
+
+    function moveDialDrag(event) {
+      if (!dialDragging || event.pointerId !== dialPointerId) return;
+      previewDialPointer(event);
+      event.preventDefault();
+    }
+
+    function finishDialDrag(event, cancelled = false) {
+      if (!dialDragging || event.pointerId !== dialPointerId) return;
+
+      const startTarget = dialStartTarget;
+      const finalTarget = dialPreviewTarget;
+
+      try {
+        if (dialEl.hasPointerCapture(event.pointerId)) {
+          dialEl.releasePointerCapture(event.pointerId);
+        }
+      } catch (_) {}
+
+      dialDragging = false;
+      dialPointerId = null;
+      dialStartTarget = null;
+      dialPreviewTarget = null;
+      dialEl.classList.remove("dial-dragging");
+
+      if (cancelled) {
+        previewTargetTemperature(startTarget);
+        return;
+      }
+
+      if (
+        Number.isFinite(finalTarget) &&
+        Math.abs(finalTarget - startTarget) > 0.001
+      ) {
+        // One REST command is sent only after the finger/mouse is released.
+        sendTargetTemperature(finalTarget);
+      } else {
+        previewTargetTemperature(startTarget);
+      }
+
+      event.preventDefault();
+    }
+
+    dialEl.addEventListener("pointerdown", beginDialDrag);
+    dialEl.addEventListener("pointermove", moveDialDrag);
+    dialEl.addEventListener("pointerup", event => finishDialDrag(event, false));
+    dialEl.addEventListener("pointercancel", event => finishDialDrag(event, true));
+
+    // Keyboard operation when the dial has focus.
+    dialEl.addEventListener("keydown", event => {
+      if (detailBusy) return;
+
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+        event.preventDefault();
+        adjustTemp(-1);
+      } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+        event.preventDefault();
+        adjustTemp(1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        const min = Number.isFinite(Number(device.climate?.min_temp))
+          ? Number(device.climate.min_temp)
+          : 17;
+        sendTargetTemperature(min);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        const max = Number.isFinite(Number(device.climate?.max_temp))
+          ? Number(device.climate.max_temp)
+          : 30;
+        sendTargetTemperature(max);
+      }
+    });
 
     function renderClimate(c) {
       device.climate = c;
@@ -724,6 +957,7 @@
       document.getElementById("device-online").className = "status-pill online";
       document.getElementById("device-online").textContent = "Online";
       updateArc(c);
+      updateDialAccessibility(c.target_temperature, c);
       updateChoices(c);
     }
 
@@ -773,6 +1007,12 @@
 
     async function loadDetail(scheduleNext = true) {
       if (route.name !== "device" || route.deviceId !== device.id) return;
+
+      // Do not let the normal climate poll overwrite the live dial preview.
+      if (dialDragging) {
+        if (scheduleNext) scheduleDetailRefresh(500);
+        return;
+      }
 
       // Never overlap detail reads. A slow ESP32 response should not cause the
       // next poll to pile on top of the current request.
